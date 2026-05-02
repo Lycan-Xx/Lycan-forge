@@ -1,0 +1,82 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&family=Syne:wght@700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* ── Backgrounds — layered dark, not flat black ── */
+  --color-bg-base: #09090E;
+  --color-bg-surface: #0F0F17;
+  --color-bg-raised: #171722;
+  --color-bg-border: #252535;
+  --color-bg-border-soft: #1C1C2A;
+
+  /* ── Text ── */
+  --color-text-primary: #EDEAE2;
+  --color-text-secondary: #8E8C9A;
+  --color-text-muted: #56546A;
+  --color-text-ghost: #2E2C3C;
+
+  /* ── Accent — orange as a living element ── */
+  --color-accent: #E8622A;
+  --color-accent-dim: #B34A1C;
+  --color-accent-muted: #6B2D10;
+  --color-accent-glow: rgba(232, 98, 42, 0.10);
+  --color-accent-glow-strong: rgba(232, 98, 42, 0.20);
+
+  /* ── Fonts ── */
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Syne", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* ── Spacing/Gaps ── */
+  --spacing-section-gap: 9rem;
+  --spacing-section-gap-sm: 5rem;
+  --spacing-grid-gap: 1.25rem;
+  --spacing-grid-gap-lg: 2rem;
+}
+
+@layer base {
+  body {
+    @apply bg-bg-base text-text-primary font-sans antialiased;
+    scroll-behavior: smooth;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display font-bold;
+  }
+}
+
+@layer components {
+  .nav-pill {
+    @apply bg-bg-surface border border-bg-border rounded-full px-4 py-1.5 text-sm font-sans text-text-secondary transition-all;
+  }
+  
+  .nav-pill:hover {
+    @apply bg-bg-raised text-text-primary border-bg-border-soft;
+  }
+
+  .nav-pill.active {
+    @apply bg-accent border-accent text-white;
+  }
+
+  .cta-pill {
+    @apply bg-accent text-white rounded-full px-6.5 py-3 font-sans font-medium hover:bg-accent-dim transition-colors;
+  }
+
+  .ghost-pill {
+    @apply border border-bg-border text-text-primary rounded-full px-6.5 py-3 font-sans font-medium hover:border-accent hover:text-accent transition-all;
+  }
+}
+
+/* Custom Utilities for editorial grid */
+.work-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-template-rows: auto;
+  gap: var(--spacing-grid-gap-lg);
+}
+
+@media (max-width: 768px) {
+  .work-grid {
+    grid-template-columns: 1fr;
+  }
+}
