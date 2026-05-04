@@ -6,6 +6,7 @@
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import NavBar from './components/layout/NavBar';
 import Footer from './components/layout/Footer';
 import FloatingCTA from './components/layout/FloatingCTA';
@@ -47,6 +48,7 @@ export default function App() {
         <Footer />
         <FloatingCTA />
       </div>
+      <Analytics />
     </Router>
   );
 }
