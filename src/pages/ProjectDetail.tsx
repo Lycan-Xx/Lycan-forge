@@ -1,7 +1,7 @@
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { PROJECTS } from '../constants';
-import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { Icon } from '@iconify/react';
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -21,7 +21,7 @@ export default function ProjectDetail() {
           to="/work" 
           className="inline-flex items-center gap-2 text-text-muted hover:text-accent transition-colors mb-12 text-sm font-mono"
         >
-          <ArrowLeft size={16} /> BACK TO WORK
+          <Icon icon="material-symbols:arrow-back-rounded" className="w-5 h-5" /> BACK TO WORK
         </Link>
 
         <header className="mb-20 space-y-8">
@@ -43,12 +43,18 @@ export default function ProjectDetail() {
           </div>
         </header>
 
-        {/* Hero Image / Placeholder */}
+        {/* Hero Image */}
         <div className="aspect-video w-full bg-bg-surface border border-bg-border rounded-[24px] mb-24 flex items-center justify-center overflow-hidden relative">
-          <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent" />
-          <p className="text-text-muted font-mono uppercase tracking-[0.2em] text-sm">
-            Full Project Presentation Case Study
-          </p>
+          {project.image ? (
+            <img src={project.image} alt={project.name} className="w-full h-full object-cover" />
+          ) : (
+            <>
+              <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent" />
+              <p className="text-text-muted font-mono uppercase tracking-[0.2em] text-sm">
+                Case Study In Review
+              </p>
+            </>
+          )}
         </div>
 
         {/* Content Section */}
@@ -79,12 +85,12 @@ export default function ProjectDetail() {
           </div>
 
           <div className="flex flex-col gap-4">
-            <a 
-              href="#" 
+            <Link 
+              to="/contact"
               className="cta-pill inline-flex items-center gap-3 text-sm"
             >
-              Live Project <ExternalLink size={14} />
-            </a>
+              Start something similar <Icon icon="material-symbols:open-in-new-rounded" className="w-4 h-4" />
+            </Link>
           </div>
         </div>
       </div>

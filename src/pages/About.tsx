@@ -1,4 +1,5 @@
 import { motion } from 'motion/react';
+import { Icon } from '@iconify/react';
 
 const stats = [
   { value: '15+', label: 'Projects Shipped' },
@@ -37,7 +38,7 @@ export default function About() {
                 LycanForge was started by Mohammad Bello — a full-stack developer and technical co-founder based in Yola, Adamawa State — with a straightforward conviction: the quality of software you can access shouldn't depend on where you live.
               </p>
               <p>
-                The agency is registered in Nigeria under the CAC and operates from the Northeast — a region historically underserved by the technology industry and increasingly in need of it. We work with clients across Nigeria and take on international projects remotely.
+                The agency is a registered trading name of LYCAN TECHNICAL AND ENGINEERING SERVICES (CAC: 9364181) and operates from the Northeast — a region historically underserved by the technology industry and increasingly in need of it. We work with clients across Nigeria and take on international projects remotely.
               </p>
               
               <div className="h-px w-32 bg-bg-border" />
@@ -70,15 +71,36 @@ export default function About() {
 
           {/* Sidebar / Founder Card */}
           <aside className="sticky top-32 space-y-12">
-            <div className="bg-bg-surface border border-bg-border p-8 rounded-[20px] space-y-6">
-              <div className="w-24 h-24 bg-bg-raised border border-bg-border rounded-[20px] overflow-hidden flex items-center justify-center text-text-muted text-xs font-mono">
-                [ PHOTO ]
+            <div className="bg-bg-surface border border-bg-border/60 p-8 rounded-[24px] space-y-6">
+              <div className="w-24 h-24 bg-bg-raised border border-bg-border rounded-[20px] overflow-hidden flex items-center justify-center relative group">
+                <img 
+                  src="https://www.linkedin.com/in/mohammad-bello/overlay/photo/" 
+                  alt="Mohammad Bello"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    // Fallback if direct LinkedIn scraping fails
+                    e.currentTarget.src = "https://ui-avatars.com/api/?name=Mohammad+Bello&background=0D1117&color=6366f1";
+                  }}
+                />
               </div>
               <div className="space-y-1">
                 <h3 className="text-white text-lg">Mohammad Bello</h3>
                 <p className="text-accent text-sm font-medium">Founder & Lead Developer</p>
               </div>
-              <div className="space-y-4 text-xs text-text-secondary leading-relaxed">
+              
+              <div className="flex gap-4 pt-2">
+                <a href="https://www.linkedin.com/in/mohammad-bello/" target="_blank" rel="noopener noreferrer" className="text-text-muted hover:text-white transition-colors">
+                  <Icon icon="linguo:linkedin" className="w-5 h-5" />
+                </a>
+                <a href="https://github.com/Lycan-Xx" target="_blank" rel="noopener noreferrer" className="text-text-muted hover:text-white transition-colors">
+                  <Icon icon="mdi:github" className="w-5 h-5" />
+                </a>
+                <a href="https://x.com/LycanXx0" target="_blank" rel="noopener noreferrer" className="text-text-muted hover:text-white transition-colors">
+                  <Icon icon="linguo:twitter" className="w-5 h-5" />
+                </a>
+              </div>
+
+              <div className="space-y-4 text-xs text-text-secondary leading-relaxed border-t border-bg-border pt-6">
                 <p>CTO, Hacksat Tech Ltd</p>
                 <p>Technical Co-Founder, Kugal.jobs</p>
                 <p>Full Stack Lead, eVault</p>

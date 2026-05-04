@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import { Check, Loader2, Send } from 'lucide-react';
+import { Icon } from '@iconify/react';
 import { Link } from 'react-router-dom';
 
 const steps = [
@@ -58,6 +58,26 @@ export default function Contact() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    
+    // Structured data for simulated email
+    const emailPayload = {
+      subject: `New Project Enquiry: ${details.name}`,
+      body: `
+        Name: ${details.name}
+        Email: ${details.email}
+        Phone: ${details.phone}
+        
+        Requirements:
+        - Needs: ${answers.needs}
+        - Budget: ${answers.budget}
+        - Timeline: ${answers.timeline}
+        
+        Message:
+        ${details.message}
+      `
+    };
+    console.log("Simulating email send to client@lycanforge.com.ng:", emailPayload);
+
     // Simulate API call
     await new Promise(r => setTimeout(r, 2000));
     setIsSubmitting(false);
@@ -189,9 +209,9 @@ export default function Contact() {
                           className="cta-pill w-full flex items-center justify-center gap-3 disabled:opacity-50"
                         >
                           {isSubmitting ? (
-                            <Loader2 className="animate-spin" size={20} />
+                            <Icon icon="material-symbols:progress-activity" className="animate-spin w-5 h-5" />
                           ) : (
-                            <>Send Message <Send size={18} /></>
+                            <>Send Message <Icon icon="material-symbols:send-rounded" className="w-[18px] h-[18px]" /></>
                           )}
                         </button>
                       </form>
@@ -206,7 +226,7 @@ export default function Contact() {
                 className="text-center py-20 space-y-8"
               >
                 <div className="w-20 h-20 bg-accent/20 text-accent rounded-full flex items-center justify-center mx-auto mb-8 shadow-[0_0_40px_var(--color-accent-glow)]">
-                  <Check size={40} strokeWidth={3} />
+                  <Icon icon="material-symbols:check-circle-rounded" className="w-12 h-12" />
                 </div>
                 <h2 className="text-3xl text-white font-display">Message received.</h2>
                 <div className="space-y-4">
@@ -232,10 +252,10 @@ export default function Contact() {
               <div className="space-y-2">
                 <p className="text-xs font-mono text-text-muted uppercase tracking-widest">DIRECT CONTACT</p>
                 <div className="flex flex-col gap-2">
-                  <a href="mailto:hello@lycanforge.com.ng" className="text-text-secondary hover:text-white transition-colors flex items-center justify-between group">
-                    hello@lycanforge.com.ng <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                  <a href="mailto:client@lycanforge.com.ng" className="text-text-secondary hover:text-white transition-colors flex items-center justify-between group">
+                    client@lycanforge.com.ng <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
                   </a>
-                  <a href="https://wa.me/2348000000000" className="text-accent hover:text-accent-dim transition-colors flex items-center justify-between group">
+                  <a href="https://wa.me/2347058392920" className="text-accent hover:text-accent-dim transition-colors flex items-center justify-between group">
                     Message on WhatsApp <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
                   </a>
                 </div>
@@ -251,8 +271,8 @@ export default function Contact() {
               <div className="space-y-2">
                 <p className="text-xs font-mono text-text-muted uppercase tracking-widest">LEGAL</p>
                 <p className="text-text-secondary leading-normal text-sm">
-                  LycanForge is a trading name of Lycan Technical and Engineering Services<br />
-                  CAC Reg: BN-3542109
+                  LycanForge — Trading name of Lycan Technical and Engineering Services<br />
+                  CAC Reg: 9364181
                 </p>
               </div>
 

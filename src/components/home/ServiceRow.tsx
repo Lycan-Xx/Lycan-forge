@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronRight } from 'lucide-react';
+import { Icon } from '@iconify/react';
 import { cn } from '../../lib/utils';
 import { Link } from 'react-router-dom';
 
@@ -88,7 +88,7 @@ export default function ServiceRow({ service }: ServiceRowProps) {
                     to="/contact" 
                     className="inline-flex items-center gap-2 text-accent text-sm font-medium hover:gap-4 transition-all"
                   >
-                    Start this project <ChevronRight size={16} />
+                    Start this project <Icon icon="material-symbols:chevron-right-rounded" className="w-5 h-5" />
                   </Link>
                 </div>
               </div>

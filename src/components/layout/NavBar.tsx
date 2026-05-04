@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
-import { Menu, X } from 'lucide-react';
+import { Icon } from '@iconify/react';
 
 const navLinks = [
   { name: 'Work', path: '/work' },
@@ -85,7 +85,7 @@ export default function NavBar() {
           onClick={() => setMobileMenuOpen(true)}
           className="md:hidden p-2 text-text-secondary hover:text-white transition-colors"
         >
-          <Menu size={24} />
+          <Icon icon="material-symbols:menu-rounded" className="w-8 h-8" />
         </button>
       </div>
 
@@ -104,7 +104,7 @@ export default function NavBar() {
                 LycanForge
               </Link>
               <button onClick={() => setMobileMenuOpen(false)} className="p-2 text-text-secondary">
-                <X size={28} />
+                <Icon icon="material-symbols:close-rounded" className="w-9 h-9" />
               </button>
             </div>
 
@@ -127,8 +127,8 @@ export default function NavBar() {
             <div className="mt-auto pt-8 border-t border-bg-border">
               <p className="text-text-muted text-xs uppercase tracking-widest font-mono mb-4">Direct Links</p>
               <div className="flex flex-col gap-3">
-                <a href="mailto:hello@lycanforge.com.ng" className="text-text-secondary hover:text-white transition-colors">hello@lycanforge.com.ng</a>
-                <a href="https://wa.me/2348000000000" className="text-accent hover:text-accent-dim transition-colors">WhatsApp Direct</a>
+                <a href="mailto:client@lycanforge.com.ng" className="text-text-secondary hover:text-white transition-colors">client@lycanforge.com.ng</a>
+                <a href="https://wa.me/2347058392920" className="text-accent hover:text-accent-dim transition-colors">WhatsApp Direct</a>
               </div>
             </div>
           </motion.div>

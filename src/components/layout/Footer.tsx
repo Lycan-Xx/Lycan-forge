@@ -32,22 +32,22 @@ export default function Footer() {
           {/* Column 3 - Contact */}
           <div className="space-y-4 text-sm text-text-secondary">
             <div className="flex flex-col gap-1">
-              <a href="mailto:hello@lycanforge.com.ng" className="hover:text-accent transition-colors">hello@lycanforge.com.ng</a>
-              <a href="https://wa.me/2348000000000" className="text-accent hover:text-accent-dim transition-colors">WhatsApp Direct →</a>
+              <a href="mailto:client@lycanforge.com.ng" className="hover:text-accent transition-colors">client@lycanforge.com.ng</a>
+              <a href="https://wa.me/2347058392920" className="text-accent hover:text-accent-dim transition-colors">WhatsApp Direct →</a>
             </div>
             <p>
               Yola, Adamawa State, Nigeria<br />
-              CAC Reg: BN-3542109
+              CAC Reg: 9364181
             </p>
           </div>
         </div>
 
         <div className="pt-8 border-t border-bg-border/50 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-text-muted">
-          <p>© 2026 LycanForge. Trading name of Lycan Technical and Engineering Services.</p>
+          <p>LycanForge — Trading name of Lycan Technical and Engineering Services. CAC: 9364181</p>
           <div className="flex items-center gap-6">
-            <a href="#" className="hover:text-text-secondary transition-colors">X (Twitter)</a>
-            <a href="#" className="hover:text-text-secondary transition-colors">LinkedIn</a>
-            <a href="#" className="hover:text-text-secondary transition-colors">GitHub</a>
+            <a href="https://x.com/LycanXx0" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">X (Twitter)</a>
+            <a href="https://www.linkedin.com/in/mohammad-bello/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">LinkedIn</a>
+            <a href="https://github.com/Lycan-Xx" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">GitHub</a>
           </div>
         </div>
       </div>
