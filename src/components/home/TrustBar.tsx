@@ -1,6 +1,6 @@
 export default function TrustBar() {
   const partners = [
-    'Kugal.jobs', 'PhiloPay', 'ABKHD Store', 'Jalolink', 'Examonchain', 'Hacksat Tech'
+     'PhiloPay', 'ABKHD Store', 'Jalolink',
   ];
 
   return (
