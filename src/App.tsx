@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import NavBar from './components/layout/NavBar';
 import Footer from './components/layout/Footer';
 import FloatingCTA from './components/layout/FloatingCTA';
+import { useStore } from './store/useStore';
 
 // Pages
 import Home from './pages/Home';
@@ -26,27 +27,35 @@ function ScrollToTop() {
   return null;
 }
 
+function Layout() {
+  const isHome = useStore((state) => state.isHome);
+  
+  return (
+    <div className="min-h-screen flex flex-col selection:bg-accent selection:text-white">
+      {!isHome && <NavBar />}
+      <main className="flex-grow">
+        <AnimatePresence mode="wait">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/work" element={<Work />} />
+            <Route path="/work/:id" element={<ProjectDetail />} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
+          </Routes>
+        </AnimatePresence>
+      </main>
+      {!isHome && <Footer />}
+      {!isHome && <FloatingCTA />}
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <Router>
       <ScrollToTop />
-      <div className="min-h-screen flex flex-col selection:bg-accent selection:text-white">
-        <NavBar />
-        <main className="flex-grow">
-          <AnimatePresence mode="wait">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/work" element={<Work />} />
-              <Route path="/work/:id" element={<ProjectDetail />} />
-              <Route path="/services" element={<Services />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/contact" element={<Contact />} />
-            </Routes>
-          </AnimatePresence>
-        </main>
-        <Footer />
-        <FloatingCTA />
-      </div>
+      <Layout />
     </Router>
   );
 }
