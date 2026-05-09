@@ -149,12 +149,9 @@ function GallerySpace() {
 
 function Rig() {
   const scroll = useScroll();
-  const setScrollProgress = useStore((state) => state.setScrollProgress);
 
   useFrame((state) => {
     if (scroll) {
-      setScrollProgress(scroll.offset);
-      
       // Camera parallax based on mouse
       state.camera.position.x = THREE.MathUtils.lerp(state.camera.position.x, (state.pointer.x * 2), 0.05);
       state.camera.position.y = THREE.MathUtils.lerp(state.camera.position.y, (state.pointer.y * 2), 0.05);

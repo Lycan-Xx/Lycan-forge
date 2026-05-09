@@ -1,16 +1,66 @@
-import { useStore } from '../../store/useStore';
+import { useRef } from 'react';
+import { useScroll } from '@react-three/drei';
+import { useFrame } from '@react-three/fiber';
 import { Icon } from '@iconify/react';
 import { Link } from 'react-router-dom';
 
 export default function HtmlOverlay() {
-  const scrollProgress = useStore((state) => state.scrollProgress);
+  const scroll = useScroll();
+  const brandRef = useRef<HTMLDivElement>(null);
+  const valuesRef = useRef<HTMLDivElement>(null);
+  const servicesRef = useRef<HTMLDivElement>(null);
+  const portfolioRef = useRef<HTMLDivElement>(null);
+  const ctaRef = useRef<HTMLDivElement>(null);
+
+  useFrame(() => {
+    if (!scroll) return;
+    const p = scroll.offset;
+
+    // Brand section
+    if (brandRef.current) {
+      brandRef.current.style.opacity = `${1 - p * 4}`;
+      brandRef.current.style.transform = `translateY(${p * -200}px)`;
+    }
+
+    // Values section
+    if (valuesRef.current) {
+      const opacity = p > 0.1 ? (p < 0.4 ? 1 : 1 - (p - 0.4) * 4) : (p - 0.1) * 10;
+      const x = p < 0.25 ? -50 + (p - 0.1) * 333 : 0;
+      valuesRef.current.style.opacity = `${opacity}`;
+      valuesRef.current.style.transform = `translateX(${x}px)`;
+    }
+
+    // Services section
+    if (servicesRef.current) {
+      const opacity = p > 0.35 ? (p < 0.65 ? 1 : 1 - (p - 0.65) * 4) : (p - 0.35) * 6;
+      const x = p < 0.5 ? 50 - (p - 0.35) * 333 : 0;
+      servicesRef.current.style.opacity = `${opacity}`;
+      servicesRef.current.style.transform = `translateX(${x}px)`;
+    }
+
+    // Portfolio section
+    if (portfolioRef.current) {
+      const opacity = p > 0.6 ? (p < 0.9 ? 1 : Math.max(0, 1 - (p - 0.9) * 4)) : 0;
+      const y = p < 0.75 ? 50 - (p - 0.6) * 333 : 0;
+      portfolioRef.current.style.opacity = `${opacity}`;
+      portfolioRef.current.style.transform = `translateY(${y}px)`;
+    }
+
+    // CTA section
+    if (ctaRef.current) {
+      const opacity = p > 0.85 ? (p - 0.85) * 10 : 0;
+      const scale = p > 0.85 ? 0.9 + (p - 0.85) * 0.6 : 0.9;
+      ctaRef.current.style.opacity = `${opacity}`;
+      ctaRef.current.style.transform = `scale(${scale})`;
+    }
+  });
 
   return (
     <div className="w-full text-white">
       {/* Section 0: Brand Intro */}
       <section className="w-full h-screen flex flex-col items-center justify-center relative pointer-events-none">
         <div 
-          style={{ opacity: 1 - scrollProgress * 4, transform: `translateY(${scrollProgress * -200}px)` }}
+          ref={brandRef}
           className="text-center space-y-6"
         >
           <div className="flex items-center justify-center gap-3 mb-4">
@@ -33,11 +83,9 @@ export default function HtmlOverlay() {
       {/* Section 1: Core Values */}
       <section className="w-full h-screen flex items-center px-12 md:px-32 pointer-events-none">
         <div 
-          style={{ 
-            opacity: scrollProgress > 0.1 ? (scrollProgress < 0.4 ? 1 : 1 - (scrollProgress - 0.4) * 4) : (scrollProgress - 0.1) * 10,
-            transform: `translateX(${scrollProgress < 0.25 ? -50 + (scrollProgress - 0.1) * 333 : 0}px)`
-          }}
+          ref={valuesRef}
           className="max-w-2xl"
+          style={{ opacity: 0 }}
         >
           <span className="text-accent font-mono text-sm tracking-widest uppercase block mb-4">01. Doctrine</span>
           <h2 className="text-5xl md:text-7xl font-display mb-8">Core Values</h2>
@@ -51,11 +99,9 @@ export default function HtmlOverlay() {
       {/* Section 2: Services */}
       <section className="w-full h-screen flex items-center justify-end px-12 md:px-32 pointer-events-none">
         <div 
-          style={{ 
-            opacity: scrollProgress > 0.35 ? (scrollProgress < 0.65 ? 1 : 1 - (scrollProgress - 0.65) * 4) : (scrollProgress - 0.35) * 6,
-            transform: `translateX(${scrollProgress < 0.5 ? 50 - (scrollProgress - 0.35) * 333 : 0}px)`
-          }}
+          ref={servicesRef}
           className="max-w-2xl text-right"
+          style={{ opacity: 0 }}
         >
           <span className="text-accent font-mono text-sm tracking-widest uppercase block mb-4">02. Capabilities</span>
           <h2 className="text-5xl md:text-7xl font-display mb-8">Services</h2>
@@ -69,11 +115,9 @@ export default function HtmlOverlay() {
       {/* Section 3: Portfolio Teaser */}
       <section className="w-full h-screen flex flex-col items-center justify-center pointer-events-none">
          <div 
-          style={{ 
-            opacity: scrollProgress > 0.6 ? (scrollProgress < 0.9 ? 1 : 1 - (scrollProgress - 0.9) * 4) : 0,
-            transform: `translateY(${scrollProgress < 0.75 ? 50 - (scrollProgress - 0.6) * 333 : 0}px)`
-          }}
+          ref={portfolioRef}
           className="text-center"
+          style={{ opacity: 0 }}
         >
           <span className="text-accent font-mono text-sm tracking-widest uppercase block mb-4">03. Archive</span>
           <h2 className="text-5xl md:text-7xl font-display mb-12">Selected Work</h2>
@@ -88,11 +132,9 @@ export default function HtmlOverlay() {
       {/* Section 4: CTA */}
       <section className="w-full h-screen flex items-center justify-center pointer-events-none">
         <div 
-          style={{ 
-            opacity: scrollProgress > 0.85 ? (scrollProgress - 0.85) * 10 : 0,
-            transform: `scale(${scrollProgress > 0.85 ? 0.9 + (scrollProgress - 0.85) * 0.6 : 0.9})`
-          }}
+          ref={ctaRef}
           className="text-center space-y-12"
+          style={{ opacity: 0 }}
         >
           <span className="text-accent font-mono text-sm tracking-widest uppercase block mb-4">04. Initiate</span>
           <h2 className="text-6xl md:text-8xl font-display">Ready to build?</h2>
