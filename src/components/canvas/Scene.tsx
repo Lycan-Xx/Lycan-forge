@@ -174,9 +174,9 @@ export default function Scene() {
       <directionalLight position={[-10, 0, -5]} intensity={1} color="#4f46e5" />
       <pointLight position={[0, -2, -5]} intensity={2} color="#ffffff" distance={10} />
       
-      {/* Background Particles */}
-      <Stars radius={50} depth={50} count={3000} factor={4} saturation={0} fade speed={1} />
-      <Sparkles count={150} scale={20} size={1.5} speed={0.4} opacity={0.6} color="#eb5e1e" />
+      {/* Background Particles - Reduced count for performance */}
+      <Stars radius={50} depth={50} count={1000} factor={4} saturation={0} fade speed={0.5} />
+      <Sparkles count={50} scale={20} size={1} speed={0.2} opacity={0.4} color="#eb5e1e" />
 
       <Rig />
       

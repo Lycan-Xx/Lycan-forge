@@ -1,8 +1,7 @@
-import { useRef } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useScroll } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { Icon } from '@iconify/react';
-import { Link } from 'react-router-dom';
 
 export default function HtmlOverlay() {
   const scroll = useScroll();
@@ -11,49 +10,99 @@ export default function HtmlOverlay() {
   const servicesRef = useRef<HTMLDivElement>(null);
   const portfolioRef = useRef<HTMLDivElement>(null);
   const ctaRef = useRef<HTMLDivElement>(null);
-
+  
+  // Use state with requestAnimationFrame batching for DOM updates
+  const [scrollState, setScrollState] = useState({
+    brand: { opacity: 1, translateY: 0 },
+    values: { opacity: 0, translateX: -50 },
+    services: { opacity: 0, translateX: 50 },
+    portfolio: { opacity: 0, translateY: 50 },
+    cta: { opacity: 0, scale: 0.9 }
+  });
+  
+  // Throttle scroll updates to requestAnimationFrame
   useFrame(() => {
     if (!scroll) return;
+    
     const p = scroll.offset;
-
-    // Brand section
-    if (brandRef.current) {
-      brandRef.current.style.opacity = `${1 - p * 4}`;
-      brandRef.current.style.transform = `translateY(${p * -200}px)`;
-    }
-
-    // Values section
-    if (valuesRef.current) {
-      const opacity = p > 0.1 ? (p < 0.4 ? 1 : 1 - (p - 0.4) * 4) : (p - 0.1) * 10;
-      const x = p < 0.25 ? -50 + (p - 0.1) * 333 : 0;
-      valuesRef.current.style.opacity = `${opacity}`;
-      valuesRef.current.style.transform = `translateX(${x}px)`;
-    }
-
-    // Services section
-    if (servicesRef.current) {
-      const opacity = p > 0.35 ? (p < 0.65 ? 1 : 1 - (p - 0.65) * 4) : (p - 0.35) * 6;
-      const x = p < 0.5 ? 50 - (p - 0.35) * 333 : 0;
-      servicesRef.current.style.opacity = `${opacity}`;
-      servicesRef.current.style.transform = `translateX(${x}px)`;
-    }
-
-    // Portfolio section
-    if (portfolioRef.current) {
-      const opacity = p > 0.6 ? (p < 0.9 ? 1 : Math.max(0, 1 - (p - 0.9) * 4)) : 0;
-      const y = p < 0.75 ? 50 - (p - 0.6) * 333 : 0;
-      portfolioRef.current.style.opacity = `${opacity}`;
-      portfolioRef.current.style.transform = `translateY(${y}px)`;
-    }
-
-    // CTA section
-    if (ctaRef.current) {
-      const opacity = p > 0.85 ? (p - 0.85) * 10 : 0;
-      const scale = p > 0.85 ? 0.9 + (p - 0.85) * 0.6 : 0.9;
-      ctaRef.current.style.opacity = `${opacity}`;
-      ctaRef.current.style.transform = `scale(${scale})`;
-    }
+    
+    // Batch all calculations first
+    const newBrandOpacity = Math.max(0, 1 - p * 4);
+    const newBrandTranslateY = p * -200;
+    
+    const newValuesOpacity = p > 0.1 ? (p < 0.4 ? 1 : Math.max(0, 1 - (p - 0.4) * 4)) : Math.max(0, (p - 0.1) * 10);
+    const newValuesTranslateX = p < 0.25 ? -50 + (p - 0.1) * 333 : 0;
+    
+    const newServicesOpacity = p > 0.35 ? (p < 0.65 ? 1 : Math.max(0, 1 - (p - 0.65) * 4)) : Math.max(0, (p - 0.35) * 6);
+    const newServicesTranslateX = p < 0.5 ? 50 - (p - 0.35) * 333 : 0;
+    
+    const newPortfolioOpacity = p > 0.6 ? (p < 0.9 ? 1 : Math.max(0, 1 - (p - 0.9) * 4)) : 0;
+    const newPortfolioTranslateY = p < 0.75 ? 50 - (p - 0.6) * 333 : 0;
+    
+    const newCtaOpacity = p > 0.85 ? (p - 0.85) * 10 : 0;
+    const newCtaScale = p > 0.85 ? 0.9 + (p - 0.85) * 0.6 : 0.9;
+    
+    // Only update state if values changed to prevent unnecessary renders
+    setScrollState(prev => {
+      if (
+        prev.brand.opacity !== newBrandOpacity ||
+        prev.brand.translateY !== newBrandTranslateY ||
+        prev.values.opacity !== newValuesOpacity ||
+        prev.values.translateX !== newValuesTranslateX ||
+        prev.services.opacity !== newServicesOpacity ||
+        prev.services.translateX !== newServicesTranslateX ||
+        prev.portfolio.opacity !== newPortfolioOpacity ||
+        prev.portfolio.translateY !== newPortfolioTranslateY ||
+        prev.cta.opacity !== newCtaOpacity ||
+        prev.cta.scale !== newCtaScale
+      ) {
+        return {
+          brand: { opacity: newBrandOpacity, translateY: newBrandTranslateY },
+          values: { opacity: newValuesOpacity, translateX: newValuesTranslateX },
+          services: { opacity: newServicesOpacity, translateX: newServicesTranslateX },
+          portfolio: { opacity: newPortfolioOpacity, translateY: newPortfolioTranslateY },
+          cta: { opacity: newCtaOpacity, scale: newCtaScale }
+        };
+      }
+      return prev;
+    });
   });
+  
+  // Apply DOM styles via useEffect on state change (batched)
+  useEffect(() => {
+    if (brandRef.current) {
+      brandRef.current.style.opacity = `${scrollState.brand.opacity}`;
+      brandRef.current.style.transform = `translateY(${scrollState.brand.translateY}px)`;
+    }
+  }, [scrollState.brand]);
+  
+  useEffect(() => {
+    if (valuesRef.current) {
+      valuesRef.current.style.opacity = `${scrollState.values.opacity}`;
+      valuesRef.current.style.transform = `translateX(${scrollState.values.translateX}px)`;
+    }
+  }, [scrollState.values]);
+  
+  useEffect(() => {
+    if (servicesRef.current) {
+      servicesRef.current.style.opacity = `${scrollState.services.opacity}`;
+      servicesRef.current.style.transform = `translateX(${scrollState.services.translateX}px)`;
+    }
+  }, [scrollState.services]);
+  
+  useEffect(() => {
+    if (portfolioRef.current) {
+      portfolioRef.current.style.opacity = `${scrollState.portfolio.opacity}`;
+      portfolioRef.current.style.transform = `translateY(${scrollState.portfolio.translateY}px)`;
+    }
+  }, [scrollState.portfolio]);
+  
+  useEffect(() => {
+    if (ctaRef.current) {
+      ctaRef.current.style.opacity = `${scrollState.cta.opacity}`;
+      ctaRef.current.style.transform = `scale(${scrollState.cta.scale})`;
+    }
+  }, [scrollState.cta]);
 
   return (
     <div className="w-full text-white">
@@ -121,11 +170,11 @@ export default function HtmlOverlay() {
         >
           <span className="text-accent font-mono text-sm tracking-widest uppercase block mb-4">03. Archive</span>
           <h2 className="text-5xl md:text-7xl font-display mb-12">Selected Work</h2>
-          <div className="pointer-events-auto">
-            <Link to="/work" className="cta-pill inline-flex items-center gap-3">
-              Dive Into Projects <Icon icon="material-symbols:arrow-right-alt-rounded" className="w-5 h-5" />
-            </Link>
-          </div>
+<div className="pointer-events-auto">
+             <a href="/work" className="cta-pill inline-flex items-center gap-3">
+               Dive Into Projects <Icon icon="material-symbols:arrow-right-alt-rounded" className="w-5 h-5" />
+             </a>
+           </div>
         </div>
       </section>
 
@@ -138,11 +187,11 @@ export default function HtmlOverlay() {
         >
           <span className="text-accent font-mono text-sm tracking-widest uppercase block mb-4">04. Initiate</span>
           <h2 className="text-6xl md:text-8xl font-display">Ready to build?</h2>
-          <div className="pointer-events-auto mt-8 inline-block">
-            <Link to="/contact" className="cta-pill px-10 py-5 text-lg inline-flex items-center gap-4 hover:shadow-[0_0_40px_var(--color-accent-glow)] transition-all duration-300">
-              Start a Project <Icon icon="material-symbols:call-made-rounded" className="w-6 h-6" />
-            </Link>
-          </div>
+<div className="pointer-events-auto mt-8 inline-block">
+             <a href="/contact" className="cta-pill px-10 py-5 text-lg inline-flex items-center gap-4 hover:shadow-[0_0_40px_var(--color-accent-glow)] transition-all duration-300">
+               Start a Project <Icon icon="material-symbols:call-made-rounded" className="w-6 h-6" />
+             </a>
+           </div>
         </div>
       </section>
     </div>
