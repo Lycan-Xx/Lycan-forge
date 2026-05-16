@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import { useScroll } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { Icon } from '@iconify/react';
+import { PROJECTS } from '../../constants';
 
 export default function HtmlOverlay() {
   const scroll = useScroll();
@@ -162,19 +163,51 @@ export default function HtmlOverlay() {
       </section>
 
       {/* Section 3: Portfolio Teaser */}
-      <section className="w-full h-screen flex flex-col items-center justify-center pointer-events-none">
-         <div 
+      <section className="w-full min-h-screen flex flex-col items-center justify-center pointer-events-none py-20">
+        <div 
           ref={portfolioRef}
-          className="text-center"
+          className="w-full"
           style={{ opacity: 0 }}
         >
-          <span className="text-accent font-mono text-sm tracking-widest uppercase block mb-4">03. Archive</span>
-          <h2 className="text-5xl md:text-7xl font-display mb-12">Selected Work</h2>
-<div className="pointer-events-auto">
-             <a href="/work" className="cta-pill inline-flex items-center gap-3">
-               Dive Into Projects <Icon icon="material-symbols:arrow-right-alt-rounded" className="w-5 h-5" />
-             </a>
-           </div>
+          <div className="max-w-[1180px] mx-auto px-6 lg:px-10">
+            <span className="text-accent font-mono text-sm tracking-widest uppercase block mb-4">03. Archive</span>
+            <h2 className="text-5xl md:text-7xl font-display mb-16">Selected Work</h2>
+            
+            {/* Project Grid */}
+            <div className="grid grid-cols-12 gap-6 mb-12">
+              {PROJECTS.filter(p => ['studywise', 'abkhd', 'jalolink'].includes(p.id)).map((project) => (
+                <div 
+                  key={project.id}
+                  className={`${project.gridSpan} ${project.height} rounded-lg overflow-hidden group cursor-pointer pointer-events-auto`}
+                >
+                  <div className="relative w-full h-full">
+                    <img 
+                      src={project.image} 
+                      alt={project.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
+                      <h3 className="text-2xl font-display font-medium text-white mb-2">{project.name}</h3>
+                      <p className="text-text-secondary text-sm mb-4">{project.oneLiner}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {project.tags.map((tag) => (
+                          <span key={tag} className="text-xs font-mono text-accent bg-accent/10 px-2 py-1 rounded">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="pointer-events-auto flex justify-center">
+              <a href="/work" className="cta-pill inline-flex items-center gap-3">
+                View All Projects <Icon icon="material-symbols:arrow-right-alt-rounded" className="w-5 h-5" />
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -187,11 +220,11 @@ export default function HtmlOverlay() {
         >
           <span className="text-accent font-mono text-sm tracking-widest uppercase block mb-4">04. Initiate</span>
           <h2 className="text-6xl md:text-8xl font-display">Ready to build?</h2>
-<div className="pointer-events-auto mt-8 inline-block">
-             <a href="/contact" className="cta-pill px-10 py-5 text-lg inline-flex items-center gap-4 hover:shadow-[0_0_40px_var(--color-accent-glow)] transition-all duration-300">
-               Start a Project <Icon icon="material-symbols:call-made-rounded" className="w-6 h-6" />
-             </a>
-           </div>
+          <div className="pointer-events-auto mt-8 inline-block">
+            <a href="/contact" className="cta-pill px-10 py-5 text-lg inline-flex items-center gap-4 hover:shadow-[0_0_40px_var(--color-accent-glow)] transition-all duration-300">
+              Start a Project <Icon icon="material-symbols:call-made-rounded" className="w-6 h-6" />
+            </a>
+          </div>
         </div>
       </section>
     </div>
