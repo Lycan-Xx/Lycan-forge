@@ -107,7 +107,7 @@ function CoreValues() {
   return (
     <group ref={groupRef}>
       {platforms.map((p, i) => (
-        <Float key={i} position={p.pos} speed={ANIMATION_CONFIG.sections.values.floatSpeed + i * 0.5} floatIntensity={ANIMATION_CONFIG.sections.values.floatIntensity}>
+        <Float key={i} position={p.pos} speed={config.floatSpeed + i * 0.5} floatIntensity={config.floatIntensity}>
           <mesh>
             <boxGeometry args={[1.5, 1.5, 1.5]} />
             <meshStandardMaterial color={p.color} wireframe />

@@ -1,0 +1,115 @@
+/* Additional CSS fixes for accessibility and mobile safety */
+
+/* Focus Indicators - WCAG 2.1 AA Requirement */
+@layer components {
+  .nav-pill:focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+  
+  .cta-pill:focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+  
+  .cta-pill:focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+  
+  a:focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+  
+  button:focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+}
+
+/* Reduced Motion Support - WCAG 2.1 AAA */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: more) {
+  :root {
+    --color-text-muted: #7a7a8f;
+    --color-text-secondary: #a0a0b5;
+  }
+}
+
+/* Smooth Scrolling Enhancement */
+@supports (scroll-behavior: smooth) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Performance Optimization - GPU Acceleration */
+.work-grid {
+  will-change: contents;
+}
+
+/* Safe Area Support for Notched Devices */
+@supports (padding: max(0px)) {
+  .floating-action {
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    padding-right: max(1.5rem, env(safe-area-inset-right));
+    padding-left: max(1.5rem, env(safe-area-inset-left));
+  }
+}
+
+/* Mobile-Specific Fixes */
+@media (max-width: 768px) {
+  /* Prevent zoom on input focus (iOS) */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* Better touch target size (48x48px minimum) */
+  button,
+  a.cta-pill,
+  a.nav-pill {
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  /* Prevent text selection jank on scroll */
+  body {
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  
+  a, button {
+    -webkit-user-select: text;
+  }
+}
+
+/* Print Styles - Hide interactive 3D canvas */
+@media print {
+  canvas,
+  .floating-action,
+  nav {
+    display: none;
+  }
+  
+  body {
+    background: white;
+    color: black;
+  }
+}
+
+/* Color Scheme Preference Support */
+@media (prefers-color-scheme: dark) {
+  /* Already dark, no changes needed */
+}
+
+/* Brightness Preference (for battery saving) */
+@media (prefers-color-scheme: light) {
+  /* Could add light mode if needed */
+}

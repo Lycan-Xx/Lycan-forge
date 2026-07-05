@@ -59,12 +59,76 @@
     @apply bg-accent border-accent text-white;
   }
 
+  /* ✅ Focus indicators for accessibility */
+  .nav-pill:focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+
   .cta-pill {
     @apply bg-accent text-white rounded-full px-6.5 py-3 font-sans font-medium hover:bg-accent-dim transition-colors;
   }
 
+  /* ✅ Focus indicators for CTA */
+  .cta-pill:focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+
   .ghost-pill {
     @apply border border-bg-border text-text-primary rounded-full px-6.5 py-3 font-sans font-medium hover:border-accent hover:text-accent transition-all;
+  }
+
+  /* ✅ Focus indicators for ghost buttons */
+  .ghost-pill:focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+}
+
+/* ✅ Focus indicators for all links */
+a:focus-visible {
+  @apply outline-2 outline-offset-2 outline-accent;
+}
+
+/* ✅ Focus indicators for buttons */
+button:focus-visible {
+  @apply outline-2 outline-offset-2 outline-accent;
+}
+
+/* ✅ Reduced Motion Support - WCAG 2.1 AAA */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ✅ High Contrast Mode Support */
+@media (prefers-contrast: more) {
+  :root {
+    --color-text-muted: #7a7a8f;
+    --color-text-secondary: #a0a0b5;
+  }
+}
+
+/* ✅ Smooth Scrolling Enhancement */
+@supports (scroll-behavior: smooth) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* ✅ Performance Optimization - GPU Acceleration */
+.work-grid {
+  will-change: contents;
+}
+
+/* ✅ Safe Area Support for Notched Devices */
+@supports (padding: max(0px)) {
+  .floating-action {
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    padding-right: max(1.5rem, env(safe-area-inset-right));
+    padding-left: max(1.5rem, env(safe-area-inset-left));
   }
 }
 
@@ -79,5 +143,44 @@
 @media (max-width: 768px) {
   .work-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* ✅ Better touch target size (48x48px minimum) */
+  button,
+  a.cta-pill,
+  a.nav-pill {
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  /* ✅ Prevent text selection jank on scroll */
+  body {
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  
+  a, button {
+    -webkit-user-select: text;
+  }
+
+  /* ✅ Prevent zoom on input focus (iOS) */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* ✅ Print Styles - Hide interactive 3D canvas */
+@media print {
+  canvas,
+  .floating-action,
+  nav {
+    display: none;
+  }
+  
+  body {
+    background: white;
+    color: black;
   }
 }
