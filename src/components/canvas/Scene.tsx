@@ -1,36 +1,67 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useScroll, Float, Stars, Sparkles, MeshDistortMaterial } from '@react-three/drei';
 import * as THREE from 'three';
 import { useStore } from '../../store/useStore';
+import { useReducedMotion, useIsMobile } from '../../utils/motionPreferences';
+import { 
+  ANIMATION_CONFIG, 
+  getParticleCount, 
+  getSectionProgress,
+  EASING 
+} from '../../config/animationConfig';
 
+/**
+ * BrandLogo - Entry point geometric abstraction
+ * Includes proper geometry/material disposal
+ */
 function BrandLogo() {
   const scroll = useScroll();
-  const ref = useRef<THREE.Group>(null);
+  const groupRef = useRef<THREE.Group>(null);
+  const meshRef = useRef<THREE.Mesh>(null);
+  const prefersReduced = useReducedMotion();
+
+  useEffect(() => {
+    return () => {
+      // Cleanup geometries and materials on unmount
+      if (meshRef.current?.geometry) {
+        meshRef.current.geometry.dispose();
+      }
+      if (meshRef.current?.material) {
+        const materials = Array.isArray(meshRef.current.material) 
+          ? meshRef.current.material 
+          : [meshRef.current.material];
+        materials.forEach(m => m.dispose());
+      }
+    };
+  }, []);
 
   useFrame(() => {
-    if (!ref.current || !scroll) return;
+    if (!groupRef.current || !scroll) return;
+    if (prefersReduced) return; // Skip animations if user prefers reduced motion
+    
+    const config = ANIMATION_CONFIG.sections.brand;
     
     // Rotate constantly
-    ref.current.rotation.y += 0.005;
+    groupRef.current.rotation.y += config.rotationSpeed;
 
     // Scroll progress 0 -> 0.25: Dolly back
-    const p1 = Math.min(scroll.offset / 0.25, 1);
+    const p1 = getSectionProgress(scroll.offset, 0, config.end);
     
     // Position z: from 0 to -5
-    ref.current.position.z = THREE.MathUtils.lerp(0, -5, p1);
-    ref.current.position.y = THREE.MathUtils.lerp(0, 1, p1);
+    groupRef.current.position.z = THREE.MathUtils.lerp(0, -5, p1);
+    groupRef.current.position.y = THREE.MathUtils.lerp(0, 1, p1);
 
     // Fade out / shrink at section 2
-    const p2 = Math.max(0, Math.min((scroll.offset - 0.25) / 0.25, 1));
-    ref.current.scale.setScalar(1 - p2);
+    const p2 = Math.max(0, (scroll.offset - config.end) / config.end);
+    groupRef.current.scale.setScalar(Math.max(0, 1 - p2));
   });
 
   return (
-    <group ref={ref}>
+    <group ref={groupRef}>
       <Float speed={2} rotationIntensity={0.5} floatIntensity={1}>
         {/* Abstract representation of logo */}
-        <mesh>
+        <mesh ref={meshRef}>
           <icosahedronGeometry args={[1, 0]} />
           <meshStandardMaterial color="#eb5e1e" wireframe />
         </mesh>
@@ -43,40 +74,43 @@ function BrandLogo() {
   );
 }
 
+/**
+ * CoreValues - Three platform visualization
+ */
 function CoreValues() {
   const scroll = useScroll();
-  const ref = useRef<THREE.Group>(null);
+  const groupRef = useRef<THREE.Group>(null);
+  const prefersReduced = useReducedMotion();
   
-  // 3 Platforms
+  // 3 Platforms - memoized
   const platforms = useMemo(() => [
-    { pos: [-3, 0, -10], rot: [0, 0, 0], color: '#eb5e1e' },
-    { pos: [0, 2, -12], rot: [0.5, 0.5, 0], color: '#ffffff' },
-    { pos: [3, 0, -10], rot: [0, 0, 0], color: '#eb5e1e' }
+    { pos: [-3, 0, -10] as [number, number, number], rot: [0, 0, 0], color: '#eb5e1e' },
+    { pos: [0, 2, -12] as [number, number, number], rot: [0.5, 0.5, 0], color: '#ffffff' },
+    { pos: [3, 0, -10] as [number, number, number], rot: [0, 0, 0], color: '#eb5e1e' }
   ], []);
 
   useFrame(() => {
-    if (!ref.current || !scroll) return;
+    if (!groupRef.current || !scroll) return;
+    if (prefersReduced) return;
     
-    // Appear at 0.25, peak at 0.375, disappear at 0.5
-    const p = scroll.offset;
-    let scale = 0;
+    const config = ANIMATION_CONFIG.sections.values;
+    const p = getSectionProgress(scroll.offset, config.start, config.end);
     
-    if (p > 0.15 && p < 0.6) {
-      // parabolic curve measuring intensity
-      scale = Math.sin(((p - 0.15) / 0.45) * Math.PI);
-    }
+    // Smooth parabolic visibility curve
+    const scale = Math.sin(p * Math.PI);
+    const targetScale = new THREE.Vector3(scale, scale, scale);
     
-    ref.current.scale.lerp(new THREE.Vector3(scale, scale, scale), 0.1);
-    ref.current.rotation.y = p * Math.PI * 2;
+    groupRef.current.scale.lerp(targetScale, 0.1);
+    groupRef.current.rotation.y = scroll.offset * Math.PI * 2;
   });
 
   return (
-    <group ref={ref} visible={false} onUpdate={(self) => (self.visible = true)}>
+    <group ref={groupRef}>
       {platforms.map((p, i) => (
-        <Float key={i} position={p.pos as [number, number, number]} speed={1.5 + i} floatIntensity={2}>
+        <Float key={i} position={p.pos} speed={ANIMATION_CONFIG.sections.values.floatSpeed + i * 0.5} floatIntensity={ANIMATION_CONFIG.sections.values.floatIntensity}>
           <mesh>
-             <boxGeometry args={[1.5, 1.5, 1.5]} />
-             <meshStandardMaterial color={p.color} wireframe />
+            <boxGeometry args={[1.5, 1.5, 1.5]} />
+            <meshStandardMaterial color={p.color} wireframe />
           </mesh>
         </Float>
       ))}
@@ -84,54 +118,65 @@ function CoreValues() {
   );
 }
 
+/**
+ * ServicesMiniView - Distorted sphere showcase
+ */
 function ServicesMiniView() {
   const scroll = useScroll();
-  const ref = useRef<THREE.Group>(null);
+  const groupRef = useRef<THREE.Group>(null);
+  const targetScale = useRef(new THREE.Vector3(0, 0, 0));
+  const prefersReduced = useReducedMotion();
 
   useFrame(() => {
-    if (!ref.current || !scroll) return;
+    if (!groupRef.current || !scroll) return;
+    if (prefersReduced) return;
     
-    const p = scroll.offset;
-    let scale = 0;
+    const config = ANIMATION_CONFIG.sections.services;
+    const p = getSectionProgress(scroll.offset, config.start, config.end);
     
-    if (p > 0.4 && p < 0.8) {
-      scale = Math.sin(((p - 0.4) / 0.4) * Math.PI);
-    }
+    // Smooth scale with easing
+    const scale = EASING.easeInOutQuad(Math.sin(p * Math.PI));
     
-    ref.current.scale.lerp(new THREE.Vector3(scale, scale, scale), 0.1);
-    ref.current.position.z = THREE.MathUtils.lerp(-20, -5, (p - 0.4) / 0.4);
+    targetScale.current.set(scale, scale, scale);
+    groupRef.current.scale.lerp(targetScale.current, 0.1);
+    groupRef.current.position.z = THREE.MathUtils.lerp(-20, -5, p);
   });
 
   return (
-    <group ref={ref}>
-       <mesh position={[0, -2, -15]}>
-         <sphereGeometry args={[3, 32, 32]} />
-         <MeshDistortMaterial color="#eb5e1e" speed={2} distort={0.4} radius={1} />
-       </mesh>
+    <group ref={groupRef}>
+      <mesh position={[0, -2, -15]}>
+        <sphereGeometry args={[3, 32, 32]} />
+        <MeshDistortMaterial color="#eb5e1e" speed={2} distort={0.4} radius={1} />
+      </mesh>
     </group>
   );
 }
 
+/**
+ * GallerySpace - Portfolio section frame
+ */
 function GallerySpace() {
   const scroll = useScroll();
-  const ref = useRef<THREE.Group>(null);
+  const groupRef = useRef<THREE.Group>(null);
+  const targetScale = useRef(new THREE.Vector3(0, 0, 0));
+  const prefersReduced = useReducedMotion();
 
   useFrame(() => {
-    if (!ref.current || !scroll) return;
+    if (!groupRef.current || !scroll) return;
+    if (prefersReduced) return;
     
-    const p = scroll.offset;
-    let scale = 0;
+    const config = ANIMATION_CONFIG.sections.portfolio;
+    const p = getSectionProgress(scroll.offset, config.start, config.end);
     
-    if (p > 0.65 && p < 0.95) {
-      scale = Math.sin(((p - 0.65) / 0.3) * Math.PI);
-    }
+    const scale = Math.sin(p * Math.PI);
+    targetScale.current.set(scale, scale, scale);
     
-    ref.current.scale.lerp(new THREE.Vector3(scale, scale, scale), 0.1);
-    ref.current.position.y = THREE.MathUtils.lerp(-10, 2, (p - 0.65) / 0.3);
+    groupRef.current.scale.lerp(targetScale.current, 0.1);
+    groupRef.current.position.y = THREE.MathUtils.lerp(-10, 2, p);
   });
 
   return (
-    <group ref={ref}>
+    <group ref={groupRef}>
       {[-4, 0, 4].map((x, i) => (
         <mesh key={i} position={[x, 0, -8]}>
           <planeGeometry args={[3, 4]} />
@@ -147,36 +192,102 @@ function GallerySpace() {
   );
 }
 
+/**
+ * Rig - Camera parallax controller with mobile safety
+ */
 function Rig() {
   const scroll = useScroll();
+  const isMobile = useIsMobile();
+  const prefersReduced = useReducedMotion();
 
   useFrame((state) => {
-    if (scroll) {
-      // Camera parallax based on mouse
-      state.camera.position.x = THREE.MathUtils.lerp(state.camera.position.x, (state.pointer.x * 2), 0.05);
-      state.camera.position.y = THREE.MathUtils.lerp(state.camera.position.y, (state.pointer.y * 2), 0.05);
-      // Keep camera looking at center
-      state.camera.lookAt(0, 0, 0);
+    if (!scroll || isMobile || prefersReduced) {
+      return;
     }
+
+    const config = ANIMATION_CONFIG.camera;
+    
+    // Clamp pointer movement to safe bounds
+    const targetX = THREE.MathUtils.clamp(
+      state.pointer.x * config.parallaxMultiplier,
+      -config.maxX,
+      config.maxX
+    );
+    const targetY = THREE.MathUtils.clamp(
+      state.pointer.y * config.parallaxMultiplier,
+      -config.maxY,
+      config.maxY
+    );
+
+    state.camera.position.x = THREE.MathUtils.lerp(
+      state.camera.position.x,
+      targetX,
+      config.parallaxLerpSpeed
+    );
+    state.camera.position.y = THREE.MathUtils.lerp(
+      state.camera.position.y,
+      targetY,
+      config.parallaxLerpSpeed
+    );
+    
+    state.camera.lookAt(0, 0, 0);
   });
 
   return null;
 }
 
+/**
+ * Main Scene Component
+ */
 export default function Scene() {
+  const prefersReduced = useReducedMotion();
+  const particleCount = useMemo(() => getParticleCount(), []);
+
   return (
     <>
-      <color attach="background" args={['#050505']} />
+      <color attach="background" args={[ANIMATION_CONFIG.canvas.clearColor]} />
       
       {/* Lighting Strategy: Dark environment with accent lighting */}
-      <ambientLight intensity={0.1} />
-      <directionalLight position={[10, 10, 5]} intensity={2} color="#eb5e1e" />
-      <directionalLight position={[-10, 0, -5]} intensity={1} color="#4f46e5" />
-      <pointLight position={[0, -2, -5]} intensity={2} color="#ffffff" distance={10} />
+      <ambientLight intensity={ANIMATION_CONFIG.lighting.ambient.intensity} />
+      <directionalLight 
+        position={ANIMATION_CONFIG.lighting.directional1.position} 
+        intensity={ANIMATION_CONFIG.lighting.directional1.intensity}
+        color={ANIMATION_CONFIG.lighting.directional1.color}
+      />
+      <directionalLight 
+        position={ANIMATION_CONFIG.lighting.directional2.position} 
+        intensity={ANIMATION_CONFIG.lighting.directional2.intensity}
+        color={ANIMATION_CONFIG.lighting.directional2.color}
+      />
+      <pointLight 
+        position={ANIMATION_CONFIG.lighting.point.position} 
+        intensity={ANIMATION_CONFIG.lighting.point.intensity}
+        color={ANIMATION_CONFIG.lighting.point.color}
+        distance={ANIMATION_CONFIG.lighting.point.distance}
+      />
       
-      {/* Background Particles - Reduced count for performance */}
-      <Stars radius={50} depth={50} count={1000} factor={4} saturation={0} fade speed={0.5} />
-      <Sparkles count={50} scale={20} size={1} speed={0.2} opacity={0.4} color="#eb5e1e" />
+      {/* Background Particles - Adaptive and respects motion preference */}
+      {!prefersReduced && (
+        <>
+          <Stars 
+            radius={ANIMATION_CONFIG.particles.stars.radius}
+            depth={ANIMATION_CONFIG.particles.stars.depth}
+            count={particleCount}
+            factor={ANIMATION_CONFIG.particles.stars.factor}
+            saturation={ANIMATION_CONFIG.particles.stars.saturation}
+            fade
+            speed={ANIMATION_CONFIG.particles.stars.speed}
+          />
+          <Sparkles 
+            count={ANIMATION_CONFIG.particles.sparkles.count}
+            scale={ANIMATION_CONFIG.particles.sparkles.scale}
+            size={ANIMATION_CONFIG.particles.sparkles.size}
+            speed={ANIMATION_CONFIG.particles.sparkles.speed}
+            opacity={ANIMATION_CONFIG.particles.sparkles.opacity}
+            color="#eb5e1e"
+          />
+        </>
+      )}
 
       <Rig />
       

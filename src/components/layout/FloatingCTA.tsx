@@ -20,7 +20,11 @@ export default function FloatingCTA() {
           href="https://wa.me/2347058392920?text=Hi LycanForge, I'd like to discuss a project."
           target="_blank"
           rel="noopener noreferrer"
-          className="fixed bottom-6 right-6 z-40 bg-accent-muted bg-opacity-90 hover:bg-accent text-white p-4 rounded-full shadow-[0_4px_20px_var(--color-accent-glow)] transition-all hover:scale-105 active:scale-95 group"
+          className="fixed bottom-6 right-6 z-40 bg-accent-muted bg-opacity-90 hover:bg-accent text-white p-4 rounded-full shadow-[0_4px_20px_var(--color-accent-glow)] transition-all hover:scale-105 active:scale-95 group floating-action focus:outline-offset-2 focus:outline-2 focus:outline-accent"
+          style={{
+            paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+            paddingRight: 'max(1rem, env(safe-area-inset-right))',
+          }}
         >
           <Icon icon="mdi:whatsapp" className="w-7 h-7" />
           <span className="absolute right-full mr-4 bg-bg-surface border border-bg-border px-3 py-1.5 rounded-lg text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
