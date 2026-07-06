@@ -292,7 +292,7 @@ function ProjectPlane({
         texture.colorSpace = THREE.SRGBColorSpace;
         textureRef.current = texture;
         if (meshRef.current?.material && !Array.isArray(meshRef.current.material)) {
-          const mat = meshRef.current.material as THREE.MeshStandardMaterial;
+          const mat = meshRef.current.material as THREE.MeshBasicMaterial;
           mat.map = texture;
           mat.needsUpdate = true;
         }
@@ -362,12 +362,10 @@ function ProjectPlane({
         }}
       >
         <planeGeometry args={[width, height]} />
-        <meshStandardMaterial
+        <meshBasicMaterial
           color={hovered ? '#f0f0f0' : '#ffffff'}
           toneMapped={false}
           side={THREE.DoubleSide}
-          roughness={0.4}
-          metalness={0.2}
         />
       </mesh>
 
