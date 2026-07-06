@@ -1,4 +1,4 @@
-import { useRef, useMemo, useEffect } from 'react';
+import { useRef, useMemo, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useScroll, Float, Stars, Sparkles, MeshDistortMaterial } from '@react-three/drei';
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
@@ -14,6 +14,7 @@ import {
   getSectionProgress,
   EASING
 } from '../../config/animationConfig';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * NOTE: requires @react-three/postprocessing + postprocessing
@@ -199,12 +200,14 @@ function GallerySpace() {
 }
 
 /**
- * ProjectPlane - Individual project card as a textured plane
+ * ProjectPlane - Individual project card as a textured plane with click navigation
  */
 function ProjectPlane({ project, position }: { project: typeof PROJECTS[0]; position: number }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
   const textureRef = useRef<THREE.Texture | null>(null);
+  const navigate = useNavigate();
+  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
     // Load texture using TextureLoader
@@ -240,6 +243,13 @@ function ProjectPlane({ project, position }: { project: typeof PROJECTS[0]; posi
 
     groupRef.current.rotation.y = mouseX * 0.3;
     groupRef.current.rotation.x = mouseY * 0.2;
+
+    // Scale up slightly on hover
+    const targetScale = hovered ? 1.1 : 1;
+    meshRef.current.scale.lerp(
+      new THREE.Vector3(targetScale, targetScale, targetScale),
+      0.1
+    );
   });
 
   useEffect(() => {
@@ -259,12 +269,27 @@ function ProjectPlane({ project, position }: { project: typeof PROJECTS[0]; posi
     };
   }, []);
 
+  const handleClick = () => {
+    navigate(`/work/${project.id}`);
+  };
+
   return (
     <group ref={groupRef} position={[position, 0, -8]}>
-      <mesh ref={meshRef}>
+      <mesh
+        ref={meshRef}
+        onClick={handleClick}
+        onPointerOver={() => {
+          document.body.style.cursor = 'pointer';
+          setHovered(true);
+        }}
+        onPointerOut={() => {
+          document.body.style.cursor = 'auto';
+          setHovered(false);
+        }}
+      >
         <planeGeometry args={[3, 4]} />
         <meshStandardMaterial
-          color="#ffffff"
+          color={hovered ? '#f0f0f0' : '#ffffff'}
           toneMapped={false}
           side={THREE.DoubleSide}
           roughness={0.4}
@@ -275,7 +300,7 @@ function ProjectPlane({ project, position }: { project: typeof PROJECTS[0]; posi
       {/* Optional: Glowing wireframe edge */}
       <lineSegments>
         <edgesGeometry args={[new THREE.PlaneGeometry(3, 4)]} />
-        <lineBasicMaterial color="#eb5e1e" linewidth={2} />
+        <lineBasicMaterial color={hovered ? '#ff7f50' : '#eb5e1e'} linewidth={2} />
       </lineSegments>
     </group>
   );
