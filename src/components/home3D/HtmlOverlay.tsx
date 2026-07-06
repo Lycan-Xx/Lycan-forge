@@ -242,38 +242,6 @@ export default function HtmlOverlay() {
             <span className="text-accent font-mono text-sm tracking-widest uppercase block mb-4">03. Archive</span>
             <h2 id="portfolio-title" className="text-5xl md:text-7xl font-display mb-16">Selected Work</h2>
             
-            {/* Project Grid */}
-            <div className="grid grid-cols-12 gap-6 mb-12">
-              {PROJECTS.filter(p => ['studywise', 'abkhd', 'jalolink'].includes(p.id)).map((project) => (
-                <div 
-                  key={project.id}
-                  className={`${project.gridSpan} ${project.height} rounded-lg overflow-hidden group cursor-pointer pointer-events-auto`}
-                  role="article"
-                  tabIndex={0}
-                >
-                  <div className="relative w-full h-full">
-                    <img 
-                      src={project.image} 
-                      alt={project.name}
-                      loading="lazy"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 group-focus:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
-                      <h3 className="text-2xl font-display font-medium text-white mb-2">{project.name}</h3>
-                      <p className="text-text-secondary text-sm mb-4">{project.oneLiner}</p>
-                      <div className="flex flex-wrap gap-2">
-                        {project.tags.map((tag) => (
-                          <span key={tag} className="text-xs font-mono text-accent bg-accent/10 px-2 py-1 rounded">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
             <div className="pointer-events-auto flex justify-center">
               <a 
                 href="/work" 

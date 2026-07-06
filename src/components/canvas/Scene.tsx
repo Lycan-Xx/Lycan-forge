@@ -5,7 +5,6 @@ import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 // ChromaticAberration + BlendFunction disabled for now — see PostFX below.
 // Re-add both imports if you turn it back on.
 import * as THREE from 'three';
-import { useStore } from '../../store/useStore';
 import { useReducedMotion, useIsMobile } from '../../utils/motionPreferences';
 import { PROJECTS } from '../../constants';
 import {
@@ -164,15 +163,66 @@ function ServicesMiniView() {
 }
 
 /**
+ * Get plane dimensions based on gridSpan and height from constants
+ * Maps Tailwind classes to approximate 3D units
+ */
+function getProjectDimensions(project: typeof PROJECTS[0]): { width: number; height: number } {
+  // Parse gridSpan to get approximate width ratio
+  let widthRatio = 1;
+  if (project.gridSpan.includes('col-span-7')) {
+    widthRatio = 1.4;
+  } else if (project.gridSpan.includes('col-span-5')) {
+    widthRatio = 1;
+  } else {
+    widthRatio = 1.2; // col-span-12
+  }
+
+  // Parse height to get aspect ratio
+  let heightPixels = 420;
+  if (project.height.includes('360')) {
+    heightPixels = 360;
+  }
+
+  // Convert to 3D scene units (scaled down)
+  // Base: 3 units width for col-span-5 (1:1 ratio)
+  const baseWidth = 2.5;
+  const baseHeight = (baseWidth * heightPixels) / 420;
+
+  return {
+    width: baseWidth * widthRatio,
+    height: baseHeight
+  };
+}
+
+/**
  * GallerySpace - Portfolio section with textured project planes
+ * Displays all projects in a grid layout with varying sizes
  */
 function GallerySpace() {
   const scroll = useScroll();
   const groupRef = useRef<THREE.Group>(null);
   const targetScale = useRef(new THREE.Vector3(0, 0, 0));
-  
-  // Use first 3 projects for the 3 planes
-  const displayProjects = useMemo(() => PROJECTS.slice(0, 3), []);
+
+  // Use all projects from constants
+  const displayProjects = useMemo(() => PROJECTS, []);
+
+  // Calculate positions for all projects in a grid pattern
+  const projectPositions = useMemo(() => {
+    return displayProjects.map((_, i) => {
+      const cols = 3;
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+      
+      // Offset each row slightly for a more interesting layout
+      const xOffset = row % 2 === 0 ? 0 : 1.5;
+      
+      return {
+        x: (col - 1) * 5 + xOffset, // Spread horizontally
+        y: -row * 4, // Stack vertically
+        z: -10 - row * 2 // Push back as we go down
+      };
+    });
+  }, [displayProjects.length]);
 
   useFrame(() => {
     if (!groupRef.current || !scroll) return;
@@ -190,9 +240,18 @@ function GallerySpace() {
   return (
     <group ref={groupRef} scale={0}>
       {displayProjects.map((project, i) => {
-        const xPositions = [-4, 0, 4];
+        const pos = projectPositions[i];
+        const dims = getProjectDimensions(project);
         return (
-          <ProjectPlane key={project.id} project={project} position={xPositions[i]} />
+          <ProjectPlane 
+            key={project.id} 
+            project={project} 
+            position={pos.x}
+            yOffset={pos.y}
+            zOffset={pos.z}
+            width={dims.width}
+            height={dims.height}
+          />
         );
       })}
     </group>
@@ -201,8 +260,23 @@ function GallerySpace() {
 
 /**
  * ProjectPlane - Individual project card as a textured plane with click navigation
+ * Supports varying sizes based on project's original image dimensions
  */
-function ProjectPlane({ project, position }: { project: typeof PROJECTS[0]; position: number }) {
+function ProjectPlane({ 
+  project, 
+  position,
+  yOffset = 0,
+  zOffset = -8,
+  width = 3,
+  height = 4
+}: { 
+  project: typeof PROJECTS[0]; 
+  position: number;
+  yOffset?: number;
+  zOffset?: number;
+  width?: number;
+  height?: number;
+}) {
   const meshRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
   const textureRef = useRef<THREE.Texture | null>(null);
@@ -274,7 +348,7 @@ function ProjectPlane({ project, position }: { project: typeof PROJECTS[0]; posi
   };
 
   return (
-    <group ref={groupRef} position={[position, 0, -8]}>
+    <group ref={groupRef} position={[position, yOffset, zOffset]}>
       <mesh
         ref={meshRef}
         onClick={handleClick}
@@ -287,7 +361,7 @@ function ProjectPlane({ project, position }: { project: typeof PROJECTS[0]; posi
           setHovered(false);
         }}
       >
-        <planeGeometry args={[3, 4]} />
+        <planeGeometry args={[width, height]} />
         <meshStandardMaterial
           color={hovered ? '#f0f0f0' : '#ffffff'}
           toneMapped={false}
@@ -297,9 +371,9 @@ function ProjectPlane({ project, position }: { project: typeof PROJECTS[0]; posi
         />
       </mesh>
 
-      {/* Optional: Glowing wireframe edge */}
+      {/* Glowing wireframe edge matching plane dimensions */}
       <lineSegments>
-        <edgesGeometry args={[new THREE.PlaneGeometry(3, 4)]} />
+        <edgesGeometry args={[new THREE.PlaneGeometry(width, height)]} />
         <lineBasicMaterial color={hovered ? '#ff7f50' : '#eb5e1e'} linewidth={2} />
       </lineSegments>
     </group>
