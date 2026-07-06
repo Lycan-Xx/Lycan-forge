@@ -173,9 +173,9 @@ export default function HtmlOverlay() {
           ref={brandRef}
           className="text-center space-y-6"
         >
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <Icon icon="mdi:code-braces" className="w-12 h-12 text-accent" aria-hidden="true" />
-          </div>
+          {/* <div className="flex items-center justify-center gap-3 mb-4">
+            <span className="text-4xl text-accent font-bold">{'Solving your problems by bringing your vision to live'}</span>
+          </div> */}
           <h1 
             id="brand-title"
             className="text-6xl md:text-8xl font-display font-medium tracking-tight bg-gradient-to-br from-white to-white/40 bg-clip-text text-transparent"
