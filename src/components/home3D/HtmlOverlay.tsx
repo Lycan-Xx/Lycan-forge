@@ -2,9 +2,11 @@ import { useRef, useEffect, useState, useMemo } from 'react';
 import { useScroll } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { Icon } from '@iconify/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { PROJECTS } from '../../constants';
 import { ANIMATION_CONFIG, getSectionProgress, EASING } from '../../config/animationConfig';
 import { useReducedMotion } from '../../utils/motionPreferences';
+import { useStore } from '../../store/useStore';
 
 /**
  * Scroll state animation values
@@ -20,6 +22,12 @@ interface ScrollAnimState {
 export default function HtmlOverlay() {
   const scroll = useScroll();
   const prefersReduced = useReducedMotion();
+  const selectedProjectId = useStore((s) => s.selectedProjectId);
+  const setSelectedProject = useStore((s) => s.setSelectedProject);
+  const selectedProject = useMemo(
+    () => PROJECTS.find((p) => p.id === selectedProjectId) ?? null,
+    [selectedProjectId]
+  );
   
   // Refs for each section
   const brandRef = useRef<HTMLDivElement>(null);
@@ -242,36 +250,44 @@ export default function HtmlOverlay() {
             <span className="text-accent font-mono text-sm tracking-widest uppercase block mb-4">03. Archive</span>
             <h2 id="portfolio-title" className="text-5xl md:text-7xl font-display mb-16">Selected Work</h2>
             
-            {/* Project Grid */}
-            <div className="grid grid-cols-12 gap-6 mb-12">
-              {PROJECTS.filter(p => ['studywise', 'abkhd', 'jalolink'].includes(p.id)).map((project) => (
-                <div 
-                  key={project.id}
-                  className={`${project.gridSpan} ${project.height} rounded-lg overflow-hidden group cursor-pointer pointer-events-auto`}
-                  role="article"
-                  tabIndex={0}
-                >
-                  <div className="relative w-full h-full">
+            {/* Project Gallery - data-driven, scales with any number of projects */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-12">
+              {PROJECTS.map((project) => {
+                const isSelected = project.id === selectedProjectId;
+                return (
+                  <button
+                    key={project.id}
+                    onClick={() => setSelectedProject(isSelected ? null : project.id)}
+                    className={`group relative aspect-[4/3] rounded-lg overflow-hidden cursor-pointer pointer-events-auto text-left transition-all duration-300 focus:outline-2 focus:outline-accent focus:outline-offset-2 ${
+                      selectedProjectId && !isSelected ? 'opacity-30 scale-95' : 'opacity-100'
+                    } ${isSelected ? 'ring-2 ring-accent shadow-[0_0_30px_var(--color-accent-glow)]' : ''}`
+                    }
+                    aria-label={`View ${project.name} details`}
+                    aria-pressed={isSelected}
+                  >
                     <img 
                       src={project.image} 
                       alt={project.name}
                       loading="lazy"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 group-focus:scale-105"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
-                      <h3 className="text-2xl font-display font-medium text-white mb-2">{project.name}</h3>
-                      <p className="text-text-secondary text-sm mb-4">{project.oneLiner}</p>
-                      <div className="flex flex-wrap gap-2">
-                        {project.tags.map((tag) => (
-                          <span key={tag} className="text-xs font-mono text-accent bg-accent/10 px-2 py-1 rounded">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent flex flex-col justify-end p-5">
+                      <h3 className="text-xl font-display font-medium text-white mb-1">{project.name}</h3>
+                      <p className="text-text-secondary text-xs line-clamp-1">{project.oneLiner}</p>
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {project.tags.slice(0, 3).map((tag) => (
+                          <span key={tag} className="text-[10px] font-mono text-accent bg-accent/10 px-1.5 py-0.5 rounded">
                             {tag}
                           </span>
                         ))}
                       </div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                    <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-bg-base/60 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Icon icon={isSelected ? 'material-symbols:close-rounded' : 'material-symbols:arrow-outward-rounded'} className="w-4 h-4 text-accent" />
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
             <div className="pointer-events-auto flex justify-center">
@@ -284,6 +300,57 @@ export default function HtmlOverlay() {
             </div>
           </div>
         </div>
+
+        {/* In-canvas project detail card - slides in when a project is selected */}
+        <AnimatePresence>
+          {selectedProject && (
+            <motion.div
+              initial={{ opacity: 0, y: 40, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 40, scale: 0.96 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              className="fixed bottom-0 left-0 right-0 md:bottom-6 md:left-1/2 md:-translate-x-1/2 md:w-[640px] pointer-events-auto z-40"
+            >
+              <div className="bg-bg-surface/95 backdrop-blur-xl border border-bg-border rounded-t-2xl md:rounded-2xl overflow-hidden shadow-2xl">
+                <div className="relative h-44 md:h-48 overflow-hidden">
+                  <img src={selectedProject.image} alt={selectedProject.name} className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-bg-surface via-bg-surface/40 to-transparent" />
+                  <button
+                    onClick={() => setSelectedProject(null)}
+                    className="absolute top-3 right-3 w-9 h-9 rounded-full bg-bg-base/70 backdrop-blur-sm flex items-center justify-center hover:bg-bg-base transition-colors"
+                    aria-label="Close project details"
+                  >
+                    <Icon icon="material-symbols:close-rounded" className="w-5 h-5 text-white" />
+                  </button>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="flex flex-wrap gap-2">
+                    {selectedProject.tags.map((tag: string) => (
+                      <span key={tag} className="font-mono text-[10px] bg-bg-border/50 border border-bg-border px-2 py-1 text-text-muted rounded">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                  <div>
+                    <h3 className="text-3xl font-display text-white mb-2">{selectedProject.name}</h3>
+                    <p className="text-text-secondary leading-relaxed">{selectedProject.description}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedProject.stack.map((tech: string) => (
+                      <span key={tech} className="text-sm text-accent font-display">{tech}</span>
+                    ))}
+                  </div>
+                  <a
+                    href={`/work/${selectedProject.id}`}
+                    className="cta-pill w-full justify-center inline-flex items-center gap-3 mt-2"
+                  >
+                    View Full Case Study <Icon icon="material-symbols:arrow-right-alt-rounded" className="w-5 h-5" />
+                  </a>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </section>
 
       {/* Section 4: CTA */}

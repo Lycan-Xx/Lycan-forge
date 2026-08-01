@@ -60,6 +60,12 @@ export const ANIMATION_CONFIG = {
       start: 0.75,
       end: 0.95,
       speed: 1,
+      frameZ: -3,
+      frameWidth: 2.6,
+      frameHeight: 3.6,
+      frameSpacing: 3.4,
+      arcRadius: 6,
+      maxVisible: 7,
     },
     cta: {
       start: 0.95,
@@ -75,22 +81,22 @@ export const ANIMATION_CONFIG = {
   },
   
   lighting: {
-    ambient: { intensity: 0.1 },
+    ambient: { intensity: 0.45 },
     directional1: { 
-      position: [10, 10, 5] as [number, number, number], 
-      intensity: 2, 
+      position: [5, 4, 6] as [number, number, number], 
+      intensity: 0.5, 
       color: '#eb5e1e' 
     },
     directional2: { 
-      position: [-10, 0, -5] as [number, number, number], 
-      intensity: 1, 
-      color: '#4f46e5' 
+      position: [-4, 2, 3] as [number, number, number], 
+      intensity: 0.25, 
+      color: '#5a5a7a' 
     },
     point: { 
-      position: [0, -2, -5] as [number, number, number], 
-      intensity: 2, 
+      position: [0, 0, 6] as [number, number, number], 
+      intensity: 0.7, 
       color: '#ffffff', 
-      distance: 10 
+      distance: 25 
     },
   },
 };
