@@ -58,8 +58,12 @@ export const ANIMATION_CONFIG = {
     },
     portfolio: {
       start: 0.75,
-      end: 0.95,
+      end: 0.88,
       speed: 1,
+    },
+    gallery: {
+      start: 0.85,
+      end: 0.95,
     },
     cta: {
       start: 0.95,
@@ -91,6 +95,20 @@ export const ANIMATION_CONFIG = {
       intensity: 2, 
       color: '#ffffff', 
       distance: 10 
+    },
+  },
+  
+  galleryLighting: {
+    ambient: { intensity: 0.6, color: '#ffffff' },
+    key: {
+      position: [0, 0, 10] as [number, number, number],
+      intensity: 0.8,
+      color: '#ffffff'
+    },
+    fill: {
+      position: [5, 5, 5] as [number, number, number],
+      intensity: 0.3,
+      color: '#f0f0ff'
     },
   },
 };

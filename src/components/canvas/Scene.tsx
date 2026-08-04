@@ -196,7 +196,7 @@ function getProjectDimensions(project: typeof PROJECTS[0]): { width: number; hei
 
 /**
  * GallerySpace - Portfolio section with textured project planes
- * Displays all projects in a grid layout with varying sizes
+ * Uses Layer 1 with isolated lighting to prevent main scene lights from affecting it
  */
 function GallerySpace() {
   const scroll = useScroll();
@@ -207,7 +207,13 @@ function GallerySpace() {
   const displayProjects = useMemo(() => PROJECTS, []);
 
   // Calculate positions for all projects in a grid pattern
+  // With 5 projects and 3 columns: row 0 (3 projects), row 1 (2 projects)
+  // Center the grid vertically around y=0
   const projectPositions = useMemo(() => {
+    const totalRows = Math.ceil(displayProjects.length / 3);
+    const gridHeight = (totalRows - 1) * 4; // Each row is 4 units apart
+    const startY = gridHeight / 2; // Start from top, center the whole thing
+    
     return displayProjects.map((_, i) => {
       const cols = 3;
       const row = Math.floor(i / cols);
@@ -218,8 +224,8 @@ function GallerySpace() {
       
       return {
         x: (col - 1) * 5 + xOffset, // Spread horizontally
-        y: -row * 4, // Stack vertically
-        z: -10 - row * 2 // Push back as we go down
+        y: startY - row * 4, // Center vertically
+        z: -5 - row * 1 // Bring closer for better visibility
       };
     });
   }, [displayProjects.length]);
@@ -227,34 +233,65 @@ function GallerySpace() {
   useFrame(() => {
     if (!groupRef.current || !scroll) return;
 
-    const config = ANIMATION_CONFIG.sections.portfolio;
+    const config = ANIMATION_CONFIG.sections.gallery;
     const p = getSectionProgress(scroll.offset, config.start, config.end);
 
     const scale = Math.sin(p * Math.PI);
     targetScale.current.set(scale, scale, scale);
 
     groupRef.current.scale.lerp(targetScale.current, 0.1);
-    groupRef.current.position.y = THREE.MathUtils.lerp(-10, 2, p);
+    // Keep group at origin - no Y translation needed
+    groupRef.current.position.y = 0;
   });
 
+  // Set up layer effect for gallery group
+  useEffect(() => {
+    if (groupRef.current) {
+      // Set gallery to layer 1 to isolate from main scene lights
+      groupRef.current.traverse((obj) => {
+        obj.layers.set(1);
+      });
+    }
+  }, []);
+
   return (
-    <group ref={groupRef} scale={0}>
-      {displayProjects.map((project, i) => {
-        const pos = projectPositions[i];
-        const dims = getProjectDimensions(project);
-        return (
-          <ProjectPlane 
-            key={project.id} 
-            project={project} 
-            position={pos.x}
-            yOffset={pos.y}
-            zOffset={pos.z}
-            width={dims.width}
-            height={dims.height}
-          />
-        );
-      })}
-    </group>
+    <>
+      {/* Gallery-specific lighting - only affects Layer 1 */}
+      <group layers={1}>
+        <ambientLight 
+          intensity={ANIMATION_CONFIG.galleryLighting.ambient.intensity}
+          color={ANIMATION_CONFIG.galleryLighting.ambient.color}
+        />
+        <directionalLight
+          position={ANIMATION_CONFIG.galleryLighting.key.position}
+          intensity={ANIMATION_CONFIG.galleryLighting.key.intensity}
+          color={ANIMATION_CONFIG.galleryLighting.key.color}
+        />
+        <directionalLight
+          position={ANIMATION_CONFIG.galleryLighting.fill.position}
+          intensity={ANIMATION_CONFIG.galleryLighting.fill.intensity}
+          color={ANIMATION_CONFIG.galleryLighting.fill.color}
+        />
+      </group>
+
+      <group ref={groupRef} scale={0}>
+        {displayProjects.map((project, i) => {
+          const pos = projectPositions[i];
+          const dims = getProjectDimensions(project);
+          return (
+            <ProjectPlane 
+              key={project.id} 
+              project={project} 
+              position={pos.x}
+              yOffset={pos.y}
+              zOffset={pos.z}
+              width={dims.width}
+              height={dims.height}
+            />
+          );
+        })}
+      </group>
+    </>
   );
 }
 
@@ -292,7 +329,7 @@ function ProjectPlane({
         texture.colorSpace = THREE.SRGBColorSpace;
         textureRef.current = texture;
         if (meshRef.current?.material && !Array.isArray(meshRef.current.material)) {
-          const mat = meshRef.current.material as THREE.MeshBasicMaterial;
+          const mat = meshRef.current.material as THREE.MeshStandardMaterial;
           mat.map = texture;
           mat.needsUpdate = true;
         }
@@ -362,8 +399,11 @@ function ProjectPlane({
         }}
       >
         <planeGeometry args={[width, height]} />
-        <meshBasicMaterial
-          color={hovered ? '#f0f0f0' : '#ffffff'}
+        <meshStandardMaterial
+          emissive={hovered ? '#1a1a1a' : '#0a0a0a'}
+          emissiveIntensity={hovered ? 0.2 : 0.1}
+          roughness={0.9}
+          metalness={0}
           toneMapped={false}
           side={THREE.DoubleSide}
         />
@@ -387,6 +427,10 @@ function Rig() {
   const prefersReduced = useReducedMotion();
 
   useFrame((state) => {
+    // Enable camera to see both layers: 0 (main) and 1 (gallery)
+    state.camera.layers.enable(0);
+    state.camera.layers.enable(1);
+
     if (!scroll || isMobile || prefersReduced) {
       return;
     }
@@ -461,7 +505,7 @@ export default function Scene() {
     <>
       <color attach="background" args={[ANIMATION_CONFIG.canvas.clearColor]} />
 
-      {/* Lighting Strategy: Dark environment with accent lighting */}
+      {/* Main Scene Lighting - Layer 0 (affects everything except gallery) */}
       <ambientLight intensity={ANIMATION_CONFIG.lighting.ambient.intensity} />
       <directionalLight
         position={ANIMATION_CONFIG.lighting.directional1.position}

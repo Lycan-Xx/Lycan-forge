@@ -1,0 +1,166 @@
+diff --git a/src/components/canvas/Scene.tsx b/src/components/canvas/Scene.tsx
+index 00b1d7b..7f2ffc1 100644
+--- a/src/components/canvas/Scene.tsx
++++ b/src/components/canvas/Scene.tsx
+@@ -207,7 +207,13 @@ function GallerySpace() {
+   const displayProjects = useMemo(() => PROJECTS, []);
+ 
+   // Calculate positions for all projects in a grid pattern
++  // With 5 projects and 3 columns: row 0 (3 projects), row 1 (2 projects)
++  // Center the grid vertically around y=0
+   const projectPositions = useMemo(() => {
++    const totalRows = Math.ceil(displayProjects.length / 3);
++    const gridHeight = (totalRows - 1) * 4; // Each row is 4 units apart
++    const startY = gridHeight / 2; // Start from top, center the whole thing
++    
+     return displayProjects.map((_, i) => {
+       const cols = 3;
+       const row = Math.floor(i / cols);
+@@ -218,8 +224,8 @@ function GallerySpace() {
+       
+       return {
+         x: (col - 1) * 5 + xOffset, // Spread horizontally
+-        y: -row * 4, // Stack vertically
+-        z: -10 - row * 2 // Push back as we go down
++        y: startY - row * 4, // Center vertically
++        z: -5 - row * 1 // Bring closer for better visibility
+       };
+     });
+   }, [displayProjects.length]);
+@@ -227,14 +233,15 @@ function GallerySpace() {
+   useFrame(() => {
+     if (!groupRef.current || !scroll) return;
+ 
+-    const config = ANIMATION_CONFIG.sections.portfolio;
++    const config = ANIMATION_CONFIG.sections.gallery;
+     const p = getSectionProgress(scroll.offset, config.start, config.end);
+ 
+     const scale = Math.sin(p * Math.PI);
+     targetScale.current.set(scale, scale, scale);
+ 
+     groupRef.current.scale.lerp(targetScale.current, 0.1);
+-    groupRef.current.position.y = THREE.MathUtils.lerp(-10, 2, p);
++    // Keep group at origin - no Y translation needed
++    groupRef.current.position.y = 0;
+   });
+ 
+   return (
+@@ -292,7 +299,7 @@ function ProjectPlane({
+         texture.colorSpace = THREE.SRGBColorSpace;
+         textureRef.current = texture;
+         if (meshRef.current?.material && !Array.isArray(meshRef.current.material)) {
+-          const mat = meshRef.current.material as THREE.MeshBasicMaterial;
++          const mat = meshRef.current.material as THREE.MeshStandardMaterial;
+           mat.map = texture;
+           mat.needsUpdate = true;
+         }
+@@ -362,8 +369,11 @@ function ProjectPlane({
+         }}
+       >
+         <planeGeometry args={[width, height]} />
+-        <meshBasicMaterial
+-          color={hovered ? '#f0f0f0' : '#ffffff'}
++        <meshStandardMaterial
++          emissive={hovered ? '#333333' : '#2a2a2a'}
++          emissiveIntensity={hovered ? 0.5 : 0.4}
++          roughness={0.9}
++          metalness={0}
+           toneMapped={false}
+           side={THREE.DoubleSide}
+         />
+diff --git a/src/components/home3D/HtmlOverlay.tsx b/src/components/home3D/HtmlOverlay.tsx
+index 0ff9c1e..6b2215a 100644
+--- a/src/components/home3D/HtmlOverlay.tsx
++++ b/src/components/home3D/HtmlOverlay.tsx
+@@ -36,6 +36,8 @@ export default function HtmlOverlay() {
+     portfolio: { opacity: 0, translateY: 50 },
+     cta: { opacity: 0, scale: 0.9 }
+   });
++  
++  const [portfolioHeaderOpacity, setPortfolioHeaderOpacity] = useState(1);
+ 
+   // Memoize section config
+   const sections = useMemo(() => ANIMATION_CONFIG.sections, []);
+@@ -81,6 +83,9 @@ export default function HtmlOverlay() {
+     );
+     const newPortfolioOpacity = EASING.easeOutQuad(portfolioProgress);
+     const newPortfolioTranslateY = (1 - portfolioProgress) * 50;
++    
++    // Header fade out as gallery scales in
++    const newPortfolioHeaderOpacity = Math.max(0, 1 - portfolioProgress * 1.5);
+ 
+     // CTA section: fade in, scale up
+     const ctaProgress = getSectionProgress(
+@@ -115,6 +120,8 @@ export default function HtmlOverlay() {
+       }
+       return prev;
+     });
++    
++    setPortfolioHeaderOpacity(newPortfolioHeaderOpacity);
+   });
+   
+   // Apply DOM styles - brand section
+@@ -162,6 +169,18 @@ export default function HtmlOverlay() {
+     }
+   }, [scrollState.cta]);
+ 
++  // Apply portfolio header fade
++  useEffect(() => {
++    if (portfolioRef.current) {
++      const headerDiv = portfolioRef.current.querySelector('div');
++      if (headerDiv) {
++        headerDiv.style.opacity = `${portfolioHeaderOpacity}`;
++        headerDiv.style.pointerEvents = portfolioHeaderOpacity < 0.5 ? 'none' : 'auto';
++        headerDiv.style.willChange = 'opacity';
++      }
++    }
++  }, [portfolioHeaderOpacity]);
++
+   return (
+     <div className="w-full text-white" role="region" aria-label="Main content">
+       {/* Section 0: Brand Intro */}
+diff --git a/src/config/animationConfig.ts b/src/config/animationConfig.ts
+index 3881d7d..6ebd19b 100644
+--- a/src/config/animationConfig.ts
++++ b/src/config/animationConfig.ts
+@@ -58,9 +58,13 @@ export const ANIMATION_CONFIG = {
+     },
+     portfolio: {
+       start: 0.75,
+-      end: 0.95,
++      end: 0.88,
+       speed: 1,
+     },
++    gallery: {
++      start: 0.85,
++      end: 0.95,
++    },
+     cta: {
+       start: 0.95,
+       end: 1.0,
+@@ -75,20 +79,20 @@ export const ANIMATION_CONFIG = {
+   },
+   
+   lighting: {
+-    ambient: { intensity: 0.1 },
++    ambient: { intensity: 0.5 },
+     directional1: { 
+       position: [10, 10, 5] as [number, number, number], 
+-      intensity: 2, 
++      intensity: 1.8, 
+       color: '#eb5e1e' 
+     },
+     directional2: { 
+       position: [-10, 0, -5] as [number, number, number], 
+-      intensity: 1, 
+-      color: '#4f46e5' 
++      intensity: 1.2, 
++      color: '#ffffff' 
+     },
+     point: { 
+       position: [0, -2, -5] as [number, number, number], 
+-      intensity: 2, 
++      intensity: 1.5, 
+       color: '#ffffff', 
+       distance: 10 
+     },

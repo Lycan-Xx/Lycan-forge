@@ -52,7 +52,7 @@ export default function HtmlOverlay() {
       sections.brand.start, 
       sections.brand.end
     );
-    const newBrandOpacity = 1 - brandProgress;
+    const newBrandOpacity = Math.max(0.8, 1 - brandProgress); // Keep at least 80% visible
     const newBrandTranslateY = brandProgress * -200;
 
     // Values section: fade in, slide from left
@@ -61,7 +61,7 @@ export default function HtmlOverlay() {
       sections.values.start,
       sections.values.end
     );
-    const newValuesOpacity = EASING.easeOutQuad(valuesProgress);
+    const newValuesOpacity = Math.max(0.8, EASING.easeOutQuad(valuesProgress)); // Ensure minimum 80% opacity
     const newValuesTranslateX = (1 - valuesProgress) * -50;
 
     // Services section: fade in, slide from right
@@ -70,7 +70,7 @@ export default function HtmlOverlay() {
       sections.services.start,
       sections.services.end
     );
-    const newServicesOpacity = EASING.easeOutQuad(servicesProgress);
+    const newServicesOpacity = Math.max(0.8, EASING.easeOutQuad(servicesProgress)); // Ensure minimum 80% opacity
     const newServicesTranslateX = (1 - servicesProgress) * 50;
 
     // Portfolio section: fade in, slide from below
@@ -79,7 +79,7 @@ export default function HtmlOverlay() {
       sections.portfolio.start,
       sections.portfolio.end
     );
-    const newPortfolioOpacity = EASING.easeOutQuad(portfolioProgress);
+    const newPortfolioOpacity = Math.max(0.8, EASING.easeOutQuad(portfolioProgress)); // Keep at least 80% visible
     const newPortfolioTranslateY = (1 - portfolioProgress) * 50;
 
     // CTA section: fade in, scale up
