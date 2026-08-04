@@ -202,6 +202,7 @@ function GallerySpace() {
   const scroll = useScroll();
   const groupRef = useRef<THREE.Group>(null);
   const targetScale = useRef(new THREE.Vector3(0, 0, 0));
+  const baseScale = 1.3; // Scale up the entire gallery group
 
   // Use all projects from constants
   const displayProjects = useMemo(() => PROJECTS, []);
@@ -225,7 +226,7 @@ function GallerySpace() {
       return {
         x: (col - 1) * 5 + xOffset, // Spread horizontally
         y: startY - row * 4, // Center vertically
-        z: -5 - row * 1 // Bring closer for better visibility
+        z: -2 - row * 0.4 // Bring much closer to camera
       };
     });
   }, [displayProjects.length]);
@@ -236,7 +237,7 @@ function GallerySpace() {
     const config = ANIMATION_CONFIG.sections.gallery;
     const p = getSectionProgress(scroll.offset, config.start, config.end);
 
-    const scale = Math.sin(p * Math.PI);
+    const scale = Math.sin(p * Math.PI) * baseScale;
     targetScale.current.set(scale, scale, scale);
 
     groupRef.current.scale.lerp(targetScale.current, 0.1);
