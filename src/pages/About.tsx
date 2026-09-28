@@ -25,7 +25,7 @@ export default function About() {
       <div className="max-w-[1180px] mx-auto px-6 lg:px-10">
         <header className="mb-20 space-y-6">
           <p className="font-mono text-accent text-xs uppercase tracking-widest font-medium">ABOUT</p>
-          <h1 className="text-4xl md:text-5xl text-white font-display leading-[1.1]">
+          <h1 className="text-5xl md:text-7xl text-text-primary font-display leading-[0.95]">
             Built from the Northeast.<br />For anyone who needs it done right.
           </h1>
         </header>
@@ -43,7 +43,7 @@ export default function About() {
               
               <div className="h-px w-32 bg-bg-border" />
               
-              <h2 className="text-2xl text-white font-display">Why LycanForge exists.</h2>
+              <h2 className="text-2xl text-text-primary font-display">Why LycanForge exists.</h2>
               <p>
                 Before starting the agency, several years were spent shipping software — fintech wallets, job marketplaces, e-commerce platforms, campus tools, and AI-integrated applications. A pattern emerged: most clients didn't need the cheapest developer. They needed someone who would show up with a written scope, build what they agreed to build, and not disappear after the invoice.
               </p>
@@ -51,7 +51,7 @@ export default function About() {
 
               <div className="h-px w-32 bg-bg-border" />
 
-              <h2 className="text-2xl text-white font-display">What we believe.</h2>
+              <h2 className="text-2xl text-text-primary font-display">What we believe.</h2>
               <ul className="space-y-6">
                 <li className="flex gap-4 items-start">
                   <span className="text-accent shrink-0">→</span>
@@ -84,18 +84,18 @@ export default function About() {
                 />
               </div>
               <div className="space-y-1">
-                <h3 className="text-white text-lg">Mohammad Bello</h3>
+                <h3 className="text-text-primary text-lg">Mohammad Bello</h3>
                 <p className="text-accent text-sm font-medium">Founder & Lead Developer</p>
               </div>
               
               <div className="flex gap-4 pt-2">
-                <a href="https://www.linkedin.com/in/mohammad-bello/" target="_blank" rel="noopener noreferrer" className="text-text-muted hover:text-white transition-colors">
+                <a href="https://www.linkedin.com/in/mohammad-bello/" target="_blank" rel="noopener noreferrer" className="text-text-muted hover:text-text-primary transition-colors">
                   <Icon icon="linguo:linkedin" className="w-5 h-5" />
                 </a>
-                <a href="https://github.com/Lycan-Xx" target="_blank" rel="noopener noreferrer" className="text-text-muted hover:text-white transition-colors">
+                <a href="https://github.com/Lycan-Xx" target="_blank" rel="noopener noreferrer" className="text-text-muted hover:text-text-primary transition-colors">
                   <Icon icon="mdi:github" className="w-5 h-5" />
                 </a>
-                <a href="https://x.com/LycanXx0" target="_blank" rel="noopener noreferrer" className="text-text-muted hover:text-white transition-colors">
+                <a href="https://x.com/LycanXx0" target="_blank" rel="noopener noreferrer" className="text-text-muted hover:text-text-primary transition-colors">
                   <Icon icon="linguo:twitter" className="w-5 h-5" />
                 </a>
               </div>

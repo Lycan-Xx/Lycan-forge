@@ -1,33 +1,29 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 @theme {
-  /* ── Backgrounds — layered dark, not flat black ── */
-  --color-bg-base: #09090E;
-  --color-bg-surface: #0F0F17;
-  --color-bg-raised: #171722;
-  --color-bg-border: #252535;
-  --color-bg-border-soft: #1C1C2A;
+  --color-bg-base: #c7ddb0;
+  --color-bg-surface: #f3f1dd;
+  --color-bg-raised: #e8e9d1;
+  --color-bg-border: #b8c5a7;
+  --color-bg-border-soft: #d7dcc8;
 
-  /* ── Text ── */
-  --color-text-primary: #EDEAE2;
-  --color-text-secondary: #8E8C9A;
-  --color-text-muted: #56546A;
-  --color-text-ghost: #2E2C3C;
+  --color-text-primary: #11140f;
+  --color-text-secondary: #50594b;
+  --color-text-muted: #707967;
+  --color-text-ghost: #9aa58d;
 
-  /* ── Accent — orange as a living element ── */
-  --color-accent: #E8622A;
-  --color-accent-dim: #B34A1C;
-  --color-accent-muted: #6B2D10;
-  --color-accent-glow: rgba(232, 98, 42, 0.10);
-  --color-accent-glow-strong: rgba(232, 98, 42, 0.20);
+  --color-accent: #22112e;
+  --color-accent-dim: #3b2548;
+  --color-accent-muted: #8fa67d;
+  --color-accent-glow: rgba(34, 17, 46, 0.10);
+  --color-accent-glow-strong: rgba(34, 17, 46, 0.18);
+  --color-sky: #dceaf4;
 
-  /* ── Fonts ── */
   --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Outfit", sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
+  --font-display: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "DM Sans", ui-sans-serif, system-ui, sans-serif;
 
-  /* ── Spacing/Gaps ── */
   --spacing-section-gap: 9rem;
   --spacing-section-gap-sm: 5rem;
   --spacing-grid-gap: 1.25rem;
@@ -35,65 +31,96 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-bg-base text-text-primary font-sans antialiased;
-    scroll-behavior: smooth;
     letter-spacing: -0.01em;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-display font-bold;
+    @apply font-display font-medium;
+    letter-spacing: -0.035em;
   }
 }
 
 @layer components {
   .nav-pill {
-    @apply bg-bg-surface border border-bg-border rounded-full px-4 py-1.5 text-sm font-sans text-text-secondary transition-all;
+    @apply bg-bg-surface/80 border border-bg-border rounded-full px-4 py-2 text-sm font-sans text-text-secondary transition-all duration-200;
   }
-  
+
   .nav-pill:hover {
-    @apply bg-bg-raised text-text-primary border-bg-border-soft;
+    @apply bg-bg-surface text-text-primary border-text-primary/20;
   }
 
   .nav-pill.active {
-    @apply bg-accent border-accent text-white;
-  }
-
-  /* ✅ Focus indicators for accessibility */
-  .nav-pill:focus-visible {
-    @apply outline-2 outline-offset-2 outline-accent;
+    @apply bg-accent border-accent text-bg-surface;
   }
 
   .cta-pill {
-    @apply bg-accent text-white rounded-full px-6.5 py-3 font-sans font-medium hover:bg-accent-dim transition-colors;
-  }
-
-  /* ✅ Focus indicators for CTA */
-  .cta-pill:focus-visible {
-    @apply outline-2 outline-offset-2 outline-accent;
+    @apply bg-accent text-bg-surface rounded-full px-6.5 py-3 font-sans font-medium hover:bg-accent-dim transition-colors;
   }
 
   .ghost-pill {
-    @apply border border-bg-border text-text-primary rounded-full px-6.5 py-3 font-sans font-medium hover:border-accent hover:text-accent transition-all;
+    @apply border border-text-primary/25 text-text-primary rounded-full px-6.5 py-3 font-sans font-medium hover:border-accent hover:bg-bg-surface/50 transition-all;
   }
 
-  /* ✅ Focus indicators for ghost buttons */
+  .nav-pill:focus-visible,
+  .cta-pill:focus-visible,
   .ghost-pill:focus-visible {
     @apply outline-2 outline-offset-2 outline-accent;
   }
+
+  .editorial-panel {
+    @apply rounded-[24px] border border-bg-border bg-bg-surface/90 shadow-[0_18px_60px_rgba(34,42,28,0.08)];
+  }
+
+  .eyebrow {
+    @apply text-[11px] font-medium uppercase tracking-[0.16em] text-text-secondary;
+  }
 }
 
-/* ✅ Focus indicators for all links */
-a:focus-visible {
-  @apply outline-2 outline-offset-2 outline-accent;
-}
-
-/* ✅ Focus indicators for buttons */
+a:focus-visible,
 button:focus-visible {
   @apply outline-2 outline-offset-2 outline-accent;
 }
 
-/* ✅ Reduced Motion Support - WCAG 2.1 AAA */
+.work-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-template-rows: auto;
+  gap: var(--spacing-grid-gap-lg);
+}
+
+@supports (padding: max(0px)) {
+  .floating-action {
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    padding-right: max(1.5rem, env(safe-area-inset-right));
+    padding-left: max(1.5rem, env(safe-area-inset-left));
+  }
+}
+
+@media (max-width: 768px) {
+  .work-grid {
+    grid-template-columns: 1fr;
+  }
+
+  button,
+  a.cta-pill,
+  a.nav-pill {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
@@ -103,82 +130,21 @@ button:focus-visible {
   }
 }
 
-/* ✅ High Contrast Mode Support */
 @media (prefers-contrast: more) {
   :root {
-    --color-text-muted: #7a7a8f;
-    --color-text-secondary: #a0a0b5;
+    --color-text-muted: #4f5749;
+    --color-text-secondary: #30372c;
+    --color-bg-border: #7d8a71;
   }
 }
 
-/* ✅ Smooth Scrolling Enhancement */
-@supports (scroll-behavior: smooth) {
-  html {
-    scroll-behavior: smooth;
-  }
-}
-
-/* ✅ Performance Optimization - GPU Acceleration */
-.work-grid {
-  will-change: contents;
-}
-
-/* ✅ Safe Area Support for Notched Devices */
-@supports (padding: max(0px)) {
-  .floating-action {
-    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
-    padding-right: max(1.5rem, env(safe-area-inset-right));
-    padding-left: max(1.5rem, env(safe-area-inset-left));
-  }
-}
-
-/* Custom Utilities for editorial grid */
-.work-grid {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  grid-template-rows: auto;
-  gap: var(--spacing-grid-gap-lg);
-}
-
-@media (max-width: 768px) {
-  .work-grid {
-    grid-template-columns: 1fr;
-  }
-
-  /* ✅ Better touch target size (48x48px minimum) */
-  button,
-  a.cta-pill,
-  a.nav-pill {
-    min-height: 48px;
-    min-width: 48px;
-  }
-
-  /* ✅ Prevent text selection jank on scroll */
-  body {
-    -webkit-user-select: none;
-    -webkit-touch-callout: none;
-  }
-  
-  a, button {
-    -webkit-user-select: text;
-  }
-
-  /* ✅ Prevent zoom on input focus (iOS) */
-  input,
-  select,
-  textarea {
-    font-size: 16px;
-  }
-}
-
-/* ✅ Print Styles - Hide interactive 3D canvas */
 @media print {
   canvas,
   .floating-action,
   nav {
     display: none;
   }
-  
+
   body {
     background: white;
     color: black;

@@ -12,7 +12,7 @@ export default function CTASection() {
       />
       
       <div className="max-w-[1180px] mx-auto px-6 text-center relative z-10 space-y-8">
-        <h2 className="text-4xl md:text-5xl text-white font-display">
+        <h2 className="text-4xl md:text-5xl text-text-primary font-display">
           Have a project in mind?
         </h2>
         

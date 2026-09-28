@@ -31,7 +31,7 @@ function Layout() {
   const isHome = useStore((state) => state.isHome);
   
   return (
-    <div className="min-h-screen flex flex-col selection:bg-accent selection:text-white">
+    <div className="min-h-screen flex flex-col selection:bg-accent selection:text-bg-surface">
       {!isHome && <NavBar />}
       <main className="flex-grow">
         <AnimatePresence mode="wait">

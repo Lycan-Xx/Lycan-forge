@@ -15,7 +15,7 @@ export default function Services() {
       <div className="max-w-[1180px] mx-auto px-6 lg:px-10">
         <header className="mb-20 space-y-6">
           <p className="font-mono text-accent text-xs uppercase tracking-widest font-medium">SERVICES</p>
-          <h1 className="text-4xl md:text-5xl text-white font-display">
+          <h1 className="text-5xl md:text-7xl text-text-primary font-display leading-[0.92]">
             We build specific things.<br />We do them well.
           </h1>
           <p className="text-text-secondary max-w-sm">

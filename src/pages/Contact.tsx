@@ -96,7 +96,7 @@ export default function Contact() {
       <div className="max-w-[1180px] mx-auto px-6 lg:px-10">
         <header className="mb-20 space-y-6">
           <p className="font-mono text-accent text-xs uppercase tracking-widest font-medium">CONTACT</p>
-          <h1 className="text-4xl md:text-5xl text-white font-display">
+          <h1 className="text-5xl md:text-7xl text-text-primary font-display leading-[0.92]">
             Let's talk about<br />what you're building.
           </h1>
           <p className="text-text-secondary max-w-sm">
@@ -132,7 +132,7 @@ export default function Contact() {
                       exit={{ opacity: 0, x: -20 }}
                       className="space-y-8"
                     >
-                      <h2 className="text-2xl md:text-3xl text-white font-display">
+                      <h2 className="text-2xl md:text-3xl text-text-primary font-display">
                         {steps[currentStep].question}
                       </h2>
                       
@@ -149,7 +149,7 @@ export default function Contact() {
                             <div className="flex items-start gap-4">
                               {opt.icon && <span className="text-2xl text-accent font-mono">{opt.icon}</span>}
                               <div>
-                                <p className="text-white font-medium">{opt.label}</p>
+                                <p className="text-text-primary font-medium">{opt.label}</p>
                                 {opt.desc && <p className="text-xs text-text-muted mt-1">{opt.desc}</p>}
                               </div>
                             </div>
@@ -164,7 +164,7 @@ export default function Contact() {
                       animate={{ opacity: 1, x: 0 }}
                       className="space-y-10"
                     >
-                       <h2 className="text-2xl md:text-3xl text-white font-display">
+                       <h2 className="text-2xl md:text-3xl text-text-primary font-display">
                         Tell us more + Your details
                       </h2>
 
@@ -174,7 +174,7 @@ export default function Contact() {
                           placeholder="Tell us what you're building. The more specific you are, the faster we can give you a useful response."
                           value={details.message}
                           onChange={(e) => setDetails({ ...details, message: e.target.value })}
-                          className="w-full bg-bg-raised border border-bg-border rounded-xl p-5 min-h-[160px] text-white focus:border-accent outline-none transition-colors"
+                          className="w-full bg-bg-surface border border-bg-border rounded-xl p-5 min-h-[160px] text-text-primary focus:border-accent outline-none transition-colors"
                         />
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -184,7 +184,7 @@ export default function Contact() {
                             placeholder="Full Name" 
                             value={details.name}
                             onChange={(e) => setDetails({ ...details, name: e.target.value })}
-                            className="bg-bg-raised border border-bg-border rounded-xl px-5 py-4 text-white focus:border-accent outline-none"
+                            className="bg-bg-surface border border-bg-border rounded-xl px-5 py-4 text-text-primary focus:border-accent outline-none"
                           />
                           <input 
                             required
@@ -192,7 +192,7 @@ export default function Contact() {
                             placeholder="Email Address" 
                             value={details.email}
                             onChange={(e) => setDetails({ ...details, email: e.target.value })}
-                            className="bg-bg-raised border border-bg-border rounded-xl px-5 py-4 text-white focus:border-accent outline-none"
+                            className="bg-bg-surface border border-bg-border rounded-xl px-5 py-4 text-text-primary focus:border-accent outline-none"
                           />
                           <input 
                             required
@@ -200,7 +200,7 @@ export default function Contact() {
                             placeholder="Phone Number" 
                             value={details.phone}
                             onChange={(e) => setDetails({ ...details, phone: e.target.value })}
-                            className="bg-bg-raised border border-bg-border rounded-xl px-5 py-4 text-white focus:border-accent outline-none"
+                            className="bg-bg-surface border border-bg-border rounded-xl px-5 py-4 text-text-primary focus:border-accent outline-none"
                           />
                         </div>
 
@@ -228,10 +228,10 @@ export default function Contact() {
                 <div className="w-20 h-20 bg-accent/20 text-accent rounded-full flex items-center justify-center mx-auto mb-8 shadow-[0_0_40px_var(--color-accent-glow)]">
                   <Icon icon="material-symbols:check-circle-rounded" className="w-12 h-12" />
                 </div>
-                <h2 className="text-3xl text-white font-display">Message received.</h2>
+                <h2 className="text-3xl text-text-primary font-display">Message received.</h2>
                 <div className="space-y-4">
                   <p className="text-text-secondary">
-                    We'll come back to you within 24 hours at <span className="text-white font-medium">{details.email}</span>.
+                    We'll come back to you within 24 hours at <span className="text-text-primary font-medium">{details.email}</span>.
                   </p>
                   <p className="text-text-secondary">
                     While you wait — here's our latest work.
@@ -252,7 +252,7 @@ export default function Contact() {
               <div className="space-y-2">
                 <p className="text-xs font-mono text-text-muted uppercase tracking-widest">DIRECT CONTACT</p>
                 <div className="flex flex-col gap-2">
-                  <a href="mailto:client@lycanforge.com.ng" className="text-text-secondary hover:text-white transition-colors flex items-center justify-between group">
+                  <a href="mailto:client@lycanforge.com.ng" className="text-text-secondary hover:text-text-primary transition-colors flex items-center justify-between group">
                     client@lycanforge.com.ng <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
                   </a>
                   <a href="https://wa.me/2347058392920" className="text-accent hover:text-accent-dim transition-colors flex items-center justify-between group">

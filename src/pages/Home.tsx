@@ -1,28 +1,27 @@
-import { useEffect, Suspense, useState } from 'react';
+import { useCallback, useEffect, Suspense, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { ScrollControls, Scroll } from '@react-three/drei';
 import Scene from '../components/canvas/Scene';
 import HtmlOverlay from '../components/home3D/HtmlOverlay';
 import { useStore } from '../store/useStore';
 import { motion } from 'motion/react';
-import { Icon } from '@iconify/react';
 import { canvasSupported, useReducedMotion } from '../utils/motionPreferences';
 import { ANIMATION_CONFIG, getOptimalDPR } from '../config/animationConfig';
+import { PROJECTS } from '../constants';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * Accessible Loader Component
  */
 function Loader() {
-  const prefersReduced = useReducedMotion();
-
   return (
     <div 
-      className="absolute inset-0 flex flex-col items-center justify-center bg-[#050505] z-50 text-white"
+      className="absolute inset-0 flex flex-col items-center justify-center bg-bg-surface z-50 text-text-primary"
       role="status"
       aria-live="polite"
       aria-label="Page loading - immersive experience preparing"
     >
-      <Icon icon="mdi:code-braces" className="w-12 h-12 text-accent mb-6" aria-hidden="true" />
+      <span className="mb-6 font-mono text-4xl font-medium text-accent" aria-hidden="true">{'{ }'}</span>
       <div className="w-48 h-1 bg-bg-border rounded-full overflow-hidden">
         <motion.div 
           initial={{ width: "0%" }}
@@ -40,39 +39,22 @@ function Loader() {
 /**
  * Fallback for unsupported browsers
  */
-function WebGLUnsupported() {
+function StaticLanding({
+  activeProjectId,
+  onProjectActivate,
+  message,
+}: {
+  activeProjectId: string;
+  onProjectActivate: (projectId: string) => void;
+  message: string;
+}) {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 w-full h-full bg-[#050505] flex items-center justify-center"
-    >
-      <div className="text-center space-y-8 px-6">
-        <div>
-          <h1 className="text-5xl md:text-7xl font-display text-white mb-4">
-            Modern Browser Required
-          </h1>
-          <p className="text-xl text-text-secondary mb-8 max-w-2xl">
-            This immersive experience requires WebGL support. Please update your browser to view this site.
-          </p>
-        </div>
-
-        <div className="space-y-4">
-          <p className="text-text-muted text-sm">Supported browsers:</p>
-          <div className="flex flex-wrap gap-4 justify-center">
-            {['Chrome', 'Firefox', 'Safari', 'Edge'].map(browser => (
-              <span key={browser} className="nav-pill">{browser}</span>
-            ))}
-          </div>
-        </div>
-
-        <a href="/work" className="cta-pill inline-flex items-center gap-3 hover:shadow-lg transition-all">
-          <Icon icon="material-symbols:arrow-right-alt-rounded" className="w-5 h-5" />
-          View Our Work
-        </a>
-      </div>
-    </motion.div>
+    <div className="min-h-screen bg-gradient-to-b from-sky via-bg-surface to-bg-base">
+      <p className="fixed right-4 top-4 z-10 rounded-full border border-bg-border bg-bg-base/90 px-3 py-2 text-xs text-text-secondary backdrop-blur-sm">
+        {message}
+      </p>
+      <HtmlOverlay activeProjectId={activeProjectId} onProjectActivate={onProjectActivate} />
+    </div>
   );
 }
 
@@ -80,10 +62,14 @@ function WebGLUnsupported() {
  * Home Page Component
  */
 export default function Home() {
+  const navigate = useNavigate();
   const setIsHome = useStore((state) => state.setIsHome);
-  const [hasWebGL, setHasWebGL] = useState(true);
+  const [hasWebGL, setHasWebGL] = useState<boolean | null>(null);
   const [height, setHeight] = useState<string>('100vh');
   const prefersReduced = useReducedMotion();
+  const [activeProjectId, setActiveProjectId] = useState(PROJECTS[0].id);
+  const activateProject = useCallback((projectId: string) => setActiveProjectId(projectId), []);
+  const openProject = useCallback((projectId: string) => navigate(`/work/${projectId}`), [navigate]);
 
   useEffect(() => {
     setIsHome(true);
@@ -109,8 +95,18 @@ export default function Home() {
     return () => window.visualViewport?.removeEventListener('resize', handleResize);
   }, []);
 
-  if (!hasWebGL) {
-    return <WebGLUnsupported />;
+  if (hasWebGL === null) {
+    return <div className="fixed inset-0 bg-bg-surface"><Loader /></div>;
+  }
+
+  if (!hasWebGL || prefersReduced) {
+    return (
+      <StaticLanding
+        activeProjectId={activeProjectId}
+        onProjectActivate={activateProject}
+        message={prefersReduced ? 'Motion reduced by your browser preference' : 'Interactive canvas unavailable'}
+      />
+    );
   }
 
   return (
@@ -118,7 +114,7 @@ export default function Home() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 w-full overflow-hidden bg-[#050505]"
+      className="fixed inset-0 w-full overflow-hidden bg-gradient-to-b from-sky via-[#e8eedb] to-bg-base"
       style={{ height }}
     >
       <Suspense fallback={<Loader />}>
@@ -127,10 +123,11 @@ export default function Home() {
             position: ANIMATION_CONFIG.canvas.camera.position, 
             fov: ANIMATION_CONFIG.canvas.camera.fov 
           }}
-          dpr={getOptimalDPR()}
+          dpr={[1, Math.min(getOptimalDPR(), 1.5)]}
+          frameloop="demand"
           gl={{ 
             antialias: true, 
-            alpha: false,
+            alpha: true,
             powerPreference: 'high-performance'
           }}
           performance={{ min: 0.5 }}
@@ -140,9 +137,9 @@ export default function Home() {
             damping={ANIMATION_CONFIG.scroll.damping}
             distance={ANIMATION_CONFIG.scroll.distance}
           >
-            <Scene />
+            <Scene activeProjectId={activeProjectId} onProjectActivate={activateProject} onProjectOpen={openProject} />
             <Scroll html style={{ width: '100%' }}>
-              <HtmlOverlay />
+              <HtmlOverlay activeProjectId={activeProjectId} onProjectActivate={activateProject} />
             </Scroll>
           </ScrollControls>
         </Canvas>

@@ -19,12 +19,12 @@ export default function Hero() {
               
               <div className="space-y-2">
                 <Reveal delay={0.15}>
-                  <h1 className="text-5xl md:text-[5.5rem] text-white leading-[0.95] tracking-tight">
+                  <h1 className="text-5xl md:text-[5.5rem] text-text-primary leading-[0.95] tracking-tight">
                     We build software
                   </h1>
                 </Reveal>
                 <Reveal delay={0.28}>
-                  <h1 className="text-5xl md:text-[5.5rem] text-white leading-[0.95] tracking-tight">
+                  <h1 className="text-5xl md:text-[5.5rem] text-text-primary leading-[0.95] tracking-tight">
                     that earns its place.
                   </h1>
                 </Reveal>

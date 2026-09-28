@@ -1,576 +1,313 @@
-import { useRef, useMemo, useEffect, useState } from 'react';
-import { useFrame } from '@react-three/fiber';
-import { useScroll, Float, Stars, Sparkles, MeshDistortMaterial } from '@react-three/drei';
-import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
-// ChromaticAberration + BlendFunction disabled for now — see PostFX below.
-// Re-add both imports if you turn it back on.
+import { useMemo, useRef } from 'react';
+import { ThreeEvent, useFrame, useThree } from '@react-three/fiber';
+import { Image as DreiImage, RoundedBox, useScroll } from '@react-three/drei';
+import * as easing from 'maath/easing';
 import * as THREE from 'three';
-import { useReducedMotion, useIsMobile } from '../../utils/motionPreferences';
 import { PROJECTS } from '../../constants';
-import {
-  ANIMATION_CONFIG,
-  getParticleCount,
-  getSectionProgress,
-  EASING
-} from '../../config/animationConfig';
-import { useNavigate } from 'react-router-dom';
+import { ANIMATION_CONFIG, getSectionProgress } from '../../config/animationConfig';
+import { useIsMobile } from '../../utils/motionPreferences';
 
-/**
- * NOTE: requires @react-three/postprocessing + postprocessing
- *   npm install @react-three/postprocessing postprocessing
- */
+interface SceneProps {
+  activeProjectId: string;
+  onProjectActivate: (projectId: string) => void;
+  onProjectOpen: (projectId: string) => void;
+}
 
-/**
- * BrandLogo - Entry point geometric abstraction
- * Includes proper geometry/material disposal.
- * Left mounted for reduced-motion users too — its default (unanimated)
- * transform is identity, which is the correct "resting" pose, and it
- * matches the fact that HtmlOverlay's brand section is the only one
- * visible by default for reduced-motion.
- */
-function BrandLogo() {
+type Position = [number, number, number];
+
+const clamp01 = (value: number) => Math.max(0, Math.min(value, 1));
+
+function BrandMark() {
   const scroll = useScroll();
   const groupRef = useRef<THREE.Group>(null);
-  const meshRef = useRef<THREE.Mesh>(null);
-  const prefersReduced = useReducedMotion();
 
-  useEffect(() => {
-    return () => {
-      if (meshRef.current?.geometry) {
-        meshRef.current.geometry.dispose();
-      }
-      if (meshRef.current?.material) {
-        const materials = Array.isArray(meshRef.current.material)
-          ? meshRef.current.material
-          : [meshRef.current.material];
-        materials.forEach((m) => m.dispose());
-      }
-    };
-  }, []);
+  useFrame((_, delta) => {
+    if (!groupRef.current) return;
+    const section = ANIMATION_CONFIG.sections.brand;
+    const progress = getSectionProgress(scroll.offset, section.start, section.end);
+    const exit = clamp01((progress - 0.58) / 0.42);
 
-  useFrame(() => {
-    if (!groupRef.current || !scroll) return;
-    if (prefersReduced) return;
-
-    const config = ANIMATION_CONFIG.sections.brand;
-
-    groupRef.current.rotation.y += config.rotationSpeed;
-
-    const p1 = getSectionProgress(scroll.offset, 0, config.end);
-    groupRef.current.position.z = THREE.MathUtils.lerp(0, -5, p1);
-    groupRef.current.position.y = THREE.MathUtils.lerp(0, 1, p1);
-
-    const p2 = Math.max(0, (scroll.offset - config.end) / config.end);
-    groupRef.current.scale.setScalar(Math.max(0, 1 - p2));
+    easing.damp3(groupRef.current.position, [0, progress * 0.65, -progress * 3.5], 0.28, delta);
+    easing.damp3(groupRef.current.scale, 1 - exit, 0.2, delta);
+    easing.dampE(groupRef.current.rotation, [progress * 0.25, progress * 0.8, progress * 0.08], 0.35, delta);
   });
 
   return (
     <group ref={groupRef}>
-      <Float speed={2} rotationIntensity={0.5} floatIntensity={1}>
-        <mesh ref={meshRef}>
-          <icosahedronGeometry args={[1, 0]} />
-          <meshStandardMaterial color="#eb5e1e" wireframe />
-        </mesh>
-        <mesh scale={0.5}>
-          <octahedronGeometry args={[1, 0]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.2} metalness={0.8} />
-        </mesh>
-      </Float>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[1.05, 0.08, 16, 72]} />
+        <meshStandardMaterial color="#22112e" roughness={0.65} />
+      </mesh>
+      <mesh scale={0.55}>
+        <icosahedronGeometry args={[1, 1]} />
+        <meshStandardMaterial color="#f3f1dd" roughness={0.78} />
+      </mesh>
     </group>
   );
 }
 
-/**
- * CoreValues - Three platform visualization
- * Scroll-revealed via a parabolic scale curve (starts at 0, peaks at 1,
- * returns to 0). Only makes sense to mount when scroll-driven animation
- * is actually running.
- */
-function CoreValues() {
+function PrinciplesScene() {
   const scroll = useScroll();
   const groupRef = useRef<THREE.Group>(null);
+  const panels = useMemo(() => [
+    { position: [-2.7, -0.2, -4.2] as Position, color: '#f3f1dd', rotation: -0.12 },
+    { position: [0, 1.15, -5.2] as Position, color: '#dceaf4', rotation: 0.05 },
+    { position: [2.7, -0.25, -4.5] as Position, color: '#aabf93', rotation: 0.12 },
+  ], []);
 
-  const platforms = useMemo(
-    () => [
-      { pos: [-3, 0, -10] as [number, number, number], color: '#eb5e1e' },
-      { pos: [0, 2, -12] as [number, number, number], color: '#ffffff' },
-      { pos: [3, 0, -10] as [number, number, number], color: '#eb5e1e' }
-    ],
-    []
-  );
-
-  useFrame(() => {
-    if (!groupRef.current || !scroll) return;
-
-    const config = ANIMATION_CONFIG.sections.values;
-    const p = getSectionProgress(scroll.offset, config.start, config.end);
-
-    const scale = Math.sin(p * Math.PI);
-    const targetScale = new THREE.Vector3(scale, scale, scale);
-
-    groupRef.current.scale.lerp(targetScale, 0.1);
-    groupRef.current.rotation.y = scroll.offset * Math.PI * 2;
+  useFrame((_, delta) => {
+    if (!groupRef.current) return;
+    const section = ANIMATION_CONFIG.sections.values;
+    const progress = getSectionProgress(scroll.offset, section.start, section.end);
+    const visibility = Math.sin(progress * Math.PI);
+    easing.damp3(groupRef.current.scale, visibility, 0.24, delta);
+    easing.dampE(groupRef.current.rotation, [0, progress * 0.35, 0], 0.32, delta);
   });
 
   return (
     <group ref={groupRef} scale={0}>
-      {platforms.map((p, i) => (
-        <Float
-          key={i}
-          position={p.pos}
-          speed={ANIMATION_CONFIG.sections.values.floatSpeed + i * 0.5}
-          floatIntensity={ANIMATION_CONFIG.sections.values.floatIntensity}
-        >
-          <mesh>
-            <boxGeometry args={[1.5, 1.5, 1.5]} />
-            <meshStandardMaterial color={p.color} wireframe />
-          </mesh>
-        </Float>
+      {panels.map((panel) => (
+        <RoundedBox key={panel.position.join('-')} args={[1.65, 1.95, 0.18]} radius={0.14} position={panel.position} rotation={[0, panel.rotation, 0]}>
+          <meshStandardMaterial color={panel.color} roughness={0.9} />
+        </RoundedBox>
       ))}
     </group>
   );
 }
 
-/**
- * ServicesMiniView - Distorted sphere showcase
- */
-function ServicesMiniView() {
+function CapabilitiesScene() {
   const scroll = useScroll();
   const groupRef = useRef<THREE.Group>(null);
-  const targetScale = useRef(new THREE.Vector3(0, 0, 0));
 
-  useFrame(() => {
-    if (!groupRef.current || !scroll) return;
-
-    const config = ANIMATION_CONFIG.sections.services;
-    const p = getSectionProgress(scroll.offset, config.start, config.end);
-
-    const scale = EASING.easeInOutQuad(Math.sin(p * Math.PI));
-
-    targetScale.current.set(scale, scale, scale);
-    groupRef.current.scale.lerp(targetScale.current, 0.1);
-    groupRef.current.position.z = THREE.MathUtils.lerp(-20, -5, p);
+  useFrame((_, delta) => {
+    if (!groupRef.current) return;
+    const section = ANIMATION_CONFIG.sections.services;
+    const progress = getSectionProgress(scroll.offset, section.start, section.end);
+    const visibility = Math.sin(progress * Math.PI);
+    easing.damp3(groupRef.current.scale, visibility, 0.24, delta);
+    easing.damp3(groupRef.current.position, [0, -0.4, THREE.MathUtils.lerp(-8, -3.5, progress)], 0.28, delta);
   });
 
   return (
     <group ref={groupRef} scale={0}>
-      <mesh position={[0, -2, -15]}>
-        <sphereGeometry args={[3, 32, 32]} />
-        <MeshDistortMaterial color="#eb5e1e" speed={2} distort={0.4} radius={1} />
-      </mesh>
+      <RoundedBox args={[4.6, 2.7, 0.22]} radius={0.22}>
+        <meshStandardMaterial color="#f3f1dd" roughness={0.92} />
+      </RoundedBox>
+      <RoundedBox args={[1.1, 0.75, 0.12]} radius={0.16} position={[-1.35, 0.45, 0.2]}>
+        <meshStandardMaterial color="#aabf93" roughness={0.92} />
+      </RoundedBox>
+      <RoundedBox args={[1.1, 0.75, 0.12]} radius={0.16} position={[0, 0.45, 0.2]}>
+        <meshStandardMaterial color="#dceaf4" roughness={0.92} />
+      </RoundedBox>
+      <RoundedBox args={[1.1, 0.75, 0.12]} radius={0.16} position={[1.35, 0.45, 0.2]}>
+        <meshStandardMaterial color="#c7ddb0" roughness={0.92} />
+      </RoundedBox>
     </group>
   );
 }
 
-/**
- * Get plane dimensions based on gridSpan and height from constants
- * Maps Tailwind classes to approximate 3D units
- */
-function getProjectDimensions(project: typeof PROJECTS[0]): { width: number; height: number } {
-  // Parse gridSpan to get approximate width ratio
-  let widthRatio = 1;
-  if (project.gridSpan.includes('col-span-7')) {
-    widthRatio = 1.4;
-  } else if (project.gridSpan.includes('col-span-5')) {
-    widthRatio = 1;
-  } else {
-    widthRatio = 1.2; // col-span-12
-  }
-
-  // Parse height to get aspect ratio
-  let heightPixels = 420;
-  if (project.height.includes('360')) {
-    heightPixels = 360;
-  }
-
-  // Convert to 3D scene units (scaled down)
-  // Base: 3 units width for col-span-5 (1:1 ratio)
-  const baseWidth = 2.5;
-  const baseHeight = (baseWidth * heightPixels) / 420;
-
-  return {
-    width: baseWidth * widthRatio,
-    height: baseHeight
-  };
+function getProjectDimensions(project: typeof PROJECTS[number], isMobile: boolean) {
+  if (isMobile) return { width: 3.25, height: 2.2 };
+  const width = project.gridSpan.includes('col-span-7') ? 2.85 : 2.55;
+  return { width, height: project.height.includes('360') ? 1.75 : 1.95 };
 }
 
-/**
- * GallerySpace - Portfolio section with textured project planes
- * Uses Layer 1 with isolated lighting to prevent main scene lights from affecting it
- */
-function GallerySpace() {
-  const scroll = useScroll();
-  const groupRef = useRef<THREE.Group>(null);
-  const targetScale = useRef(new THREE.Vector3(0, 0, 0));
-  const baseScale = 1.3; // Scale up the entire gallery group
+function getGalleryLayout(
+  viewport: { width: number; height: number },
+  isMobile: boolean,
+  activeIndex: number,
+): Position[] {
+  if (isMobile) {
+    const spacing = Math.max(3.9, viewport.width * 0.88);
+    return PROJECTS.map((_, index) => [
+      (index - activeIndex) * spacing,
+      -0.15,
+      -Math.abs(index - activeIndex) * 1.25,
+    ]);
+  }
 
-  // Use all projects from constants
-  const displayProjects = useMemo(() => PROJECTS, []);
-
-  // Calculate positions for all projects in a grid pattern
-  // With 5 projects and 3 columns: row 0 (3 projects), row 1 (2 projects)
-  // Center the grid vertically around y=0
-  const projectPositions = useMemo(() => {
-    const totalRows = Math.ceil(displayProjects.length / 3);
-    const gridHeight = (totalRows - 1) * 4; // Each row is 4 units apart
-    const startY = gridHeight / 2; // Start from top, center the whole thing
-    
-    return displayProjects.map((_, i) => {
-      const cols = 3;
-      const row = Math.floor(i / cols);
-      const col = i % cols;
-      
-      // Offset each row slightly for a more interesting layout
-      const xOffset = row % 2 === 0 ? 0 : 1.5;
-      
-      return {
-        x: (col - 1) * 5 + xOffset, // Spread horizontally
-        y: startY - row * 4, // Center vertically
-        z: -2 - row * 0.4 // Bring much closer to camera
-      };
-    });
-  }, [displayProjects.length]);
-
-  useFrame(() => {
-    if (!groupRef.current || !scroll) return;
-
-    const config = ANIMATION_CONFIG.sections.gallery;
-    const p = getSectionProgress(scroll.offset, config.start, config.end);
-
-    const scale = Math.sin(p * Math.PI) * baseScale;
-    targetScale.current.set(scale, scale, scale);
-
-    groupRef.current.scale.lerp(targetScale.current, 0.1);
-    // Keep group at origin - no Y translation needed
-    groupRef.current.position.y = 0;
-  });
-
-  // Set up layer effect for gallery group
-  useEffect(() => {
-    if (groupRef.current) {
-      // Set gallery to layer 1 to isolate from main scene lights
-      groupRef.current.traverse((obj) => {
-        obj.layers.set(1);
-      });
-    }
-  }, []);
-
-  return (
-    <>
-      {/* Gallery-specific lighting - only affects Layer 1 */}
-      <group layers={1}>
-        <ambientLight 
-          intensity={ANIMATION_CONFIG.galleryLighting.ambient.intensity}
-          color={ANIMATION_CONFIG.galleryLighting.ambient.color}
-        />
-        <directionalLight
-          position={ANIMATION_CONFIG.galleryLighting.key.position}
-          intensity={ANIMATION_CONFIG.galleryLighting.key.intensity}
-          color={ANIMATION_CONFIG.galleryLighting.key.color}
-        />
-        <directionalLight
-          position={ANIMATION_CONFIG.galleryLighting.fill.position}
-          intensity={ANIMATION_CONFIG.galleryLighting.fill.intensity}
-          color={ANIMATION_CONFIG.galleryLighting.fill.color}
-        />
-      </group>
-
-      <group ref={groupRef} scale={0}>
-        {displayProjects.map((project, i) => {
-          const pos = projectPositions[i];
-          const dims = getProjectDimensions(project);
-          return (
-            <ProjectPlane 
-              key={project.id} 
-              project={project} 
-              position={pos.x}
-              yOffset={pos.y}
-              zOffset={pos.z}
-              width={dims.width}
-              height={dims.height}
-            />
-          );
-        })}
-      </group>
-    </>
-  );
+  const x = Math.min(viewport.width * 0.28, 3.65);
+  const y = Math.min(viewport.height * 0.2, 1.75);
+  return [
+    [-x, y * 0.78, -0.55],
+    [0, y * 1.05, 0],
+    [x, y * 0.45, -0.85],
+    [-x * 0.58, -y, -0.1],
+    [x * 0.62, -y * 1.04, -0.45],
+  ];
 }
 
-/**
- * ProjectPlane - Individual project card as a textured plane with click navigation
- * Supports varying sizes based on project's original image dimensions
- */
-function ProjectPlane({ 
-  project, 
+function FloatingProjectCard({
+  project,
   position,
-  yOffset = 0,
-  zOffset = -8,
-  width = 3,
-  height = 4
-}: { 
-  project: typeof PROJECTS[0]; 
-  position: number;
-  yOffset?: number;
-  zOffset?: number;
-  width?: number;
-  height?: number;
+  index,
+  galleryReveal,
+  active,
+  isMobile,
+  onActivate,
+  onOpen,
+}: {
+  project: typeof PROJECTS[number];
+  position: Position;
+  index: number;
+  galleryReveal: { current: number };
+  active: boolean;
+  isMobile: boolean;
+  onActivate: () => void;
+  onOpen: () => void;
 }) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const groupRef = useRef<THREE.Group>(null);
-  const textureRef = useRef<THREE.Texture | null>(null);
-  const navigate = useNavigate();
-  const [hovered, setHovered] = useState(false);
+  const anchorRef = useRef<THREE.Group>(null);
+  const interactionRef = useRef<THREE.Group>(null);
+  const worldPosition = useRef(new THREE.Vector3());
+  const projectedPosition = useRef(new THREE.Vector3());
+  const { width, height } = getProjectDimensions(project, isMobile);
 
-  useEffect(() => {
-    // Load texture using TextureLoader
-    const loader = new THREE.TextureLoader();
-    loader.load(
-      project.image,
-      (texture) => {
-        texture.colorSpace = THREE.SRGBColorSpace;
-        textureRef.current = texture;
-        if (meshRef.current?.material && !Array.isArray(meshRef.current.material)) {
-          const mat = meshRef.current.material as THREE.MeshStandardMaterial;
-          mat.map = texture;
-          mat.needsUpdate = true;
-        }
-      },
-      undefined,
-      () => console.warn(`Failed to load texture for ${project.id}`)
+  useFrame((state, delta) => {
+    if (!anchorRef.current || !interactionRef.current) return;
+
+    const reveal = clamp01((galleryReveal.current - index * 0.035) / 0.84);
+    const floatY = Math.sin(state.clock.elapsedTime * 0.72 + index * 1.37) * (isMobile ? 0.045 : 0.085);
+
+    interactionRef.current.getWorldPosition(worldPosition.current);
+    projectedPosition.current.copy(worldPosition.current).project(state.camera);
+    const dx = state.pointer.x - projectedPosition.current.x;
+    const dy = state.pointer.y - projectedPosition.current.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const proximity = isMobile ? 0 : clamp01(1 - (distance - 0.06) / 0.46) * reveal;
+
+    easing.damp3(
+      anchorRef.current.position,
+      [position[0], position[1] + floatY * reveal, position[2] + proximity * 0.42 + (1 - reveal) * 4],
+      0.2,
+      delta,
     );
-
-    return () => {
-      if (textureRef.current) {
-        textureRef.current.dispose();
-      }
-    };
-  }, [project.image, project.id]);
-
-  useFrame((state) => {
-    if (!groupRef.current || !meshRef.current) return;
-
-    // Subtle rotation following mouse position
-    const mouseX = state.pointer.x;
-    const mouseY = state.pointer.y;
-
-    groupRef.current.rotation.y = mouseX * 0.3;
-    groupRef.current.rotation.x = mouseY * 0.2;
-
-    // Scale up slightly on hover
-    const targetScale = hovered ? 1.1 : 1;
-    meshRef.current.scale.lerp(
-      new THREE.Vector3(targetScale, targetScale, targetScale),
-      0.1
+    easing.dampE(
+      interactionRef.current.rotation,
+      [-dy * 0.16 * proximity, dx * 0.23 * proximity, -dx * 0.025 * proximity],
+      0.16,
+      delta,
     );
+    easing.damp3(interactionRef.current.scale, reveal * (active ? 1.045 : 0.96), 0.18, delta);
   });
 
-  useEffect(() => {
-    return () => {
-      if (meshRef.current?.geometry) {
-        meshRef.current.geometry.dispose();
-      }
-      if (meshRef.current?.material) {
-        const materials = Array.isArray(meshRef.current.material)
-          ? meshRef.current.material
-          : [meshRef.current.material];
-        materials.forEach((m) => {
-          m.dispose();
-          if ('map' in m && m.map) (m.map as THREE.Texture).dispose();
-        });
-      }
-    };
-  }, []);
-
-  const handleClick = () => {
-    navigate(`/work/${project.id}`);
+  const handleClick = (event: ThreeEvent<MouseEvent>) => {
+    const target = event.nativeEvent.target;
+    if (target instanceof HTMLElement && target.closest('a, button')) return;
+    event.stopPropagation();
+    onOpen();
   };
 
   return (
-    <group ref={groupRef} position={[position, yOffset, zOffset]}>
-      <mesh
-        ref={meshRef}
-        onClick={handleClick}
-        onPointerOver={() => {
-          document.body.style.cursor = 'pointer';
-          setHovered(true);
-        }}
-        onPointerOut={() => {
-          document.body.style.cursor = 'auto';
-          setHovered(false);
-        }}
-      >
-        <planeGeometry args={[width, height]} />
-        <meshStandardMaterial
-          emissive={hovered ? '#1a1a1a' : '#0a0a0a'}
-          emissiveIntensity={hovered ? 0.2 : 0.1}
-          roughness={0.9}
-          metalness={0}
+    <group ref={anchorRef}>
+      <group ref={interactionRef} scale={0}>
+        <RoundedBox args={[width + 0.2, height + 0.34, 0.12]} radius={0.14} position={[0, -0.08, 0]}>
+          <meshStandardMaterial color={active ? '#f3f1dd' : '#e8e9d1'} roughness={0.9} />
+        </RoundedBox>
+        <DreiImage
+          url={project.image}
+          scale={[width, height]}
+          position={[0, 0.09, 0.08]}
+          radius={0.09}
           toneMapped={false}
-          side={THREE.DoubleSide}
+          color={active ? '#ffffff' : '#d8ddcf'}
+          zoom={active ? 1.025 : 1}
+          onClick={handleClick}
+          onPointerOver={(event) => {
+            const target = event.nativeEvent.target;
+            if (target instanceof HTMLElement && target.closest('a, button')) return;
+            event.stopPropagation();
+            document.body.style.cursor = 'pointer';
+            onActivate();
+          }}
+          onPointerMove={(event) => {
+            const target = event.nativeEvent.target;
+            if (target instanceof HTMLElement && target.closest('a, button')) return;
+            event.stopPropagation();
+          }}
+          onPointerOut={(event) => {
+            event.stopPropagation();
+            document.body.style.cursor = 'auto';
+          }}
         />
-      </mesh>
-
-      {/* Glowing wireframe edge matching plane dimensions */}
-      <lineSegments>
-        <edgesGeometry args={[new THREE.PlaneGeometry(width, height)]} />
-        <lineBasicMaterial color={hovered ? '#ff7f50' : '#eb5e1e'} linewidth={2} />
-      </lineSegments>
+      </group>
     </group>
   );
 }
 
-/**
- * Rig - Camera parallax controller with mobile safety
- */
-function Rig() {
+function FloatingProjectGallery({ activeProjectId, onProjectActivate, onProjectOpen }: SceneProps) {
+  const scroll = useScroll();
+  const viewport = useThree((state) => state.viewport);
+  const isMobile = useIsMobile();
+  const rootRef = useRef<THREE.Group>(null);
+  const revealRef = useRef(0);
+  const activeIndex = Math.max(0, PROJECTS.findIndex((project) => project.id === activeProjectId));
+  const positions = useMemo(
+    () => getGalleryLayout(viewport, isMobile, activeIndex),
+    [viewport.width, viewport.height, isMobile, activeIndex],
+  );
+
+  useFrame((state, delta) => {
+    const section = ANIMATION_CONFIG.sections.gallery;
+    const enter = getSectionProgress(scroll.offset, section.start, section.start + 0.075);
+    const exit = getSectionProgress(scroll.offset, section.end - 0.035, section.end);
+    const visibility = enter * (1 - exit);
+    revealRef.current = THREE.MathUtils.damp(revealRef.current, visibility, 7, delta);
+
+    if (rootRef.current) rootRef.current.visible = revealRef.current > 0.004;
+    if (visibility > 0.001 || revealRef.current > 0.005) state.invalidate();
+  });
+
+  return (
+    <group ref={rootRef} visible={false}>
+      {PROJECTS.map((project, index) => (
+        <FloatingProjectCard
+          key={project.id}
+          project={project}
+          position={positions[index]}
+          index={index}
+          galleryReveal={revealRef}
+          active={project.id === activeProjectId}
+          isMobile={isMobile}
+          onActivate={() => onProjectActivate(project.id)}
+          onOpen={() => onProjectOpen(project.id)}
+        />
+      ))}
+    </group>
+  );
+}
+
+function CameraRig() {
   const scroll = useScroll();
   const isMobile = useIsMobile();
-  const prefersReduced = useReducedMotion();
 
-  useFrame((state) => {
-    // Enable camera to see both layers: 0 (main) and 1 (gallery)
-    state.camera.layers.enable(0);
-    state.camera.layers.enable(1);
+  useFrame((state, delta) => {
+    if (isMobile) return;
+    const gallery = getSectionProgress(scroll.offset, ANIMATION_CONFIG.sections.gallery.start, ANIMATION_CONFIG.sections.gallery.end);
+    const targetX = gallery > 0 ? 0 : THREE.MathUtils.clamp(state.pointer.x * 0.45, -0.6, 0.6);
+    const targetY = gallery > 0 ? 0 : THREE.MathUtils.clamp(state.pointer.y * 0.3, -0.4, 0.4);
+    const moving = Math.abs(state.camera.position.x - targetX) > 0.001 || Math.abs(state.camera.position.y - targetY) > 0.001;
 
-    if (!scroll || isMobile || prefersReduced) {
-      return;
-    }
-
-    const config = ANIMATION_CONFIG.camera;
-
-    const targetX = THREE.MathUtils.clamp(
-      state.pointer.x * config.parallaxMultiplier,
-      -config.maxX,
-      config.maxX
-    );
-    const targetY = THREE.MathUtils.clamp(
-      state.pointer.y * config.parallaxMultiplier,
-      -config.maxY,
-      config.maxY
-    );
-
-    state.camera.position.x = THREE.MathUtils.lerp(
-      state.camera.position.x,
-      targetX,
-      config.parallaxLerpSpeed
-    );
-    state.camera.position.y = THREE.MathUtils.lerp(
-      state.camera.position.y,
-      targetY,
-      config.parallaxLerpSpeed
-    );
-
+    state.camera.position.x = THREE.MathUtils.damp(state.camera.position.x, targetX, 5, delta);
+    state.camera.position.y = THREE.MathUtils.damp(state.camera.position.y, targetY, 5, delta);
     state.camera.lookAt(0, 0, 0);
+    if (moving) state.invalidate();
   });
 
   return null;
 }
 
-/**
- * PostFX — bloom + vignette + subtle chromatic aberration.
- * Skipped entirely for reduced-motion (no scroll-driven scene to
- * accent, and it's pure GPU cost with no functional purpose there).
- * Multisampling drops on mobile to keep frame cost down.
- */
-function PostFX() {
-  return (
-    <EffectComposer multisampling={0}>
-      <Bloom
-        intensity={1.1}
-        luminanceThreshold={0.15}
-        luminanceSmoothing={0.9}
-        mipmapBlur
-        radius={0.8}
-        resolutionScale={0.5}
-      />
-      {/* ChromaticAberration disabled for now — smallest visual payoff of
-          the three effects, cut first while diagnosing perf, add back last */}
-      {/* <ChromaticAberration
-        blendFunction={BlendFunction.NORMAL}
-        offset={new THREE.Vector2(0.0008, 0.0008)}
-      /> */}
-      <Vignette eskil={false} offset={0.25} darkness={0.9} />
-    </EffectComposer>
-  );
-}
-
-/**
- * Main Scene Component
- */
-export default function Scene() {
-  const prefersReduced = useReducedMotion();
-  const isMobile = useIsMobile();
-  const particleCount = useMemo(() => getParticleCount(), []);
-
+export default function Scene(props: SceneProps) {
   return (
     <>
-      <color attach="background" args={[ANIMATION_CONFIG.canvas.clearColor]} />
+      <ambientLight intensity={1.15} color="#f6f2df" />
+      <hemisphereLight args={['#dceaf4', '#94aa80', 1.3]} />
+      <directionalLight position={[5, 7, 8]} intensity={1.2} color="#fffaf0" />
 
-      {/* Main Scene Lighting - Layer 0 (affects everything except gallery) */}
-      <ambientLight intensity={ANIMATION_CONFIG.lighting.ambient.intensity} />
-      <directionalLight
-        position={ANIMATION_CONFIG.lighting.directional1.position}
-        intensity={ANIMATION_CONFIG.lighting.directional1.intensity}
-        color={ANIMATION_CONFIG.lighting.directional1.color}
-      />
-      <directionalLight
-        position={ANIMATION_CONFIG.lighting.directional2.position}
-        intensity={ANIMATION_CONFIG.lighting.directional2.intensity}
-        color={ANIMATION_CONFIG.lighting.directional2.color}
-      />
-      <pointLight
-        position={ANIMATION_CONFIG.lighting.point.position}
-        intensity={ANIMATION_CONFIG.lighting.point.intensity}
-        color={ANIMATION_CONFIG.lighting.point.color}
-        distance={ANIMATION_CONFIG.lighting.point.distance}
-      />
-
-      {/* Background Particles - Adaptive and respects motion preference */}
-      {!prefersReduced && (
-        <>
-          <Stars
-            radius={ANIMATION_CONFIG.particles.stars.radius}
-            depth={ANIMATION_CONFIG.particles.stars.depth}
-            count={particleCount}
-            factor={ANIMATION_CONFIG.particles.stars.factor}
-            saturation={ANIMATION_CONFIG.particles.stars.saturation}
-            fade
-            speed={ANIMATION_CONFIG.particles.stars.speed}
-          />
-          <Sparkles
-            count={ANIMATION_CONFIG.particles.sparkles.count}
-            scale={ANIMATION_CONFIG.particles.sparkles.scale}
-            size={ANIMATION_CONFIG.particles.sparkles.size}
-            speed={ANIMATION_CONFIG.particles.sparkles.speed}
-            opacity={ANIMATION_CONFIG.particles.sparkles.opacity}
-            color="#eb5e1e"
-          />
-        </>
-      )}
-
-      <Rig />
-
-      {/* Narrative Elements */}
-      <BrandLogo />
-
-      {/* Scroll-revealed elements: skipped for reduced-motion since their
-          resting state (fully scaled/visible) would otherwise overlap
-          the brand logo instead of progressively revealing */}
-      {!prefersReduced && (
-        <>
-          <CoreValues />
-          <ServicesMiniView />
-          <GallerySpace />
-        </>
-      )}
-
-      {/* Grid Floor for depth */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -5, -10]}>
-        <planeGeometry args={[100, 100]} />
-        <meshStandardMaterial color="#eb5e1e" wireframe transparent opacity={0.05} />
-      </mesh>
-
-      {!prefersReduced && !isMobile && <PostFX />}
+      <CameraRig />
+      <BrandMark />
+      <PrinciplesScene />
+      <CapabilitiesScene />
+      <FloatingProjectGallery {...props} />
     </>
   );
 }

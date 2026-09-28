@@ -1,99 +1,58 @@
-import { useParams, Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { PROJECTS } from '../constants';
-import { Icon } from '@iconify/react';
 
 export default function ProjectDetail() {
   const { id } = useParams();
-  const project = PROJECTS.find(p => p.id === id);
+  const project = PROJECTS.find((item) => item.id === id);
 
-  if (!project) return <Navigate to="/work" />;
+  if (!project) return <Navigate to="/work" replace />;
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="bg-bg-base pt-40 pb-32"
-    >
-      <div className="max-w-[1180px] mx-auto px-6 lg:px-10">
-        <Link 
-          to="/work" 
-          className="inline-flex items-center gap-2 text-text-muted hover:text-accent transition-colors mb-12 text-sm font-mono"
-        >
-          <Icon icon="material-symbols:arrow-back-rounded" className="w-5 h-5" /> BACK TO WORK
-        </Link>
-
-        <header className="mb-20 space-y-8">
-          <div className="flex flex-wrap gap-3">
-            {project.tags.map(tag => (
-              <span key={tag} className="font-mono text-[10px] bg-bg-surface border border-bg-border px-2 py-1 text-text-muted rounded">
-                {tag}
-              </span>
-            ))}
-          </div>
-          
-          <div className="space-y-4">
-            <h1 className="text-5xl md:text-7xl text-white font-display leading-[0.9]">
-              {project.name}
-            </h1>
-            <p className="text-xl text-text-secondary max-w-2xl leading-relaxed">
-              {project.oneLiner}
-            </p>
-          </div>
-        </header>
-
-        {/* Hero Image */}
-        <div className="aspect-video w-full bg-bg-surface border border-bg-border rounded-[24px] mb-24 flex items-center justify-center overflow-hidden relative">
-          {project.image ? (
-            <img src={project.image} alt={project.name} className="w-full h-full object-cover" />
-          ) : (
-            <>
-              <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent" />
-              <p className="text-text-muted font-mono uppercase tracking-[0.2em] text-sm">
-                Case Study In Review
-              </p>
-            </>
-          )}
+    <motion.main initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-h-screen bg-bg-base pb-24 pt-28 md:pb-32 md:pt-32">
+      <div className="mx-auto max-w-[1280px] px-4 md:px-8">
+        <div className="mb-5 flex items-center justify-between gap-4 text-sm">
+          <Link to="/work" className="rounded-full border border-text-primary/25 px-4 py-2 transition-colors hover:bg-bg-surface">← All work</Link>
+          <p className="eyebrow hidden sm:block">Case study · {project.name}</p>
         </div>
 
-        {/* Content Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-20 mb-32">
-          <div className="space-y-8">
-            <h2 className="text-2xl text-white font-display">The Problem</h2>
-            <p className="text-text-secondary leading-relaxed whitespace-pre-line">
-              {project.problem}
-            </p>
-          </div>
-          <div className="space-y-8">
-            <h2 className="text-2xl text-white font-display">What We Built</h2>
-            <p className="text-text-secondary leading-relaxed whitespace-pre-line">
-              {project.solution}
-            </p>
-          </div>
-        </div>
+        <figure className="h-[44vh] min-h-[340px] overflow-hidden rounded-[24px] border border-bg-border bg-bg-raised md:h-[62vh]">
+          <img src={project.image} alt={`${project.name} product interface`} className="h-full w-full object-cover" />
+        </figure>
 
-        {/* Tech Stack */}
-        <div className="pt-20 border-t border-bg-border flex flex-col md:flex-row items-start md:items-center justify-between gap-12">
-          <div className="space-y-4">
-            <p className="text-xs font-mono text-text-muted uppercase tracking-widest font-medium">TECH STACK</p>
-            <div className="flex flex-wrap gap-x-6 gap-y-2 text-text-secondary">
-              {project.stack.map(tech => (
-                <span key={tech} className="font-display text-lg">{tech}</span>
+        <section className="grid gap-8 py-10 md:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)] md:gap-14 md:py-16">
+          <div>
+            <p className="eyebrow mb-5">{project.tags.slice(0, 3).join(' · ')}</p>
+            <h1 className="max-w-4xl text-5xl leading-[0.9] md:text-8xl">{project.name}</h1>
+            <p className="mt-7 max-w-2xl text-lg leading-relaxed text-text-secondary md:text-xl">{project.oneLiner}</p>
+          </div>
+
+          <aside className="editorial-panel self-start p-5 md:p-6">
+            <p className="eyebrow mb-4">Project stack</p>
+            <div className="flex flex-wrap gap-2">
+              {project.stack.map((technology) => (
+                <span key={technology} className="rounded-full border border-bg-border bg-bg-raised px-3 py-2 text-xs text-text-secondary">{technology}</span>
               ))}
             </div>
-          </div>
-
-          <div className="flex flex-col gap-4">
-            <Link 
-              to="/contact"
-              className="cta-pill inline-flex items-center gap-3 text-sm"
-            >
-              Start something similar <Icon icon="material-symbols:open-in-new-rounded" className="w-4 h-4" />
+            <Link to="/contact" className="cta-pill mt-6 flex w-full items-center justify-between">
+              Build something similar <span aria-hidden="true">↗</span>
             </Link>
-          </div>
-        </div>
+          </aside>
+        </section>
+
+        <section className="grid gap-4 border-t border-bg-border pt-8 md:grid-cols-2 md:gap-6 md:pt-12">
+          <article className="rounded-[24px] bg-bg-surface/75 p-6 md:p-9">
+            <p className="eyebrow mb-5">The problem</p>
+            <h2 className="mb-5 text-3xl">What needed to change.</h2>
+            <p className="leading-relaxed text-text-secondary">{project.problem}</p>
+          </article>
+          <article className="rounded-[24px] bg-bg-raised p-6 md:p-9">
+            <p className="eyebrow mb-5">The response</p>
+            <h2 className="mb-5 text-3xl">What we built.</h2>
+            <p className="leading-relaxed text-text-secondary">{project.solution}</p>
+          </article>
+        </section>
       </div>
-    </motion.div>
+    </motion.main>
   );
 }

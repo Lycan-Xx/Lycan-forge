@@ -36,7 +36,7 @@ export default function ServiceRow({ service }: ServiceRowProps) {
           )}>
             {service.number}
           </span>
-          <h3 className="text-xl md:text-2xl text-white font-display">
+          <h3 className="text-xl md:text-2xl text-text-primary font-display">
             {service.name}
           </h3>
         </div>

@@ -7,7 +7,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-16">
           {/* Column 1 - Brand */}
           <div className="space-y-4">
-            <Link to="/" className="font-display text-2xl font-bold text-white">
+            <Link to="/" className="font-display text-2xl font-medium text-text-primary">
               LycanForge
             </Link>
             <p className="text-text-secondary max-w-[240px] text-sm leading-relaxed">
@@ -45,9 +45,9 @@ export default function Footer() {
         <div className="pt-8 border-t border-bg-border/50 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-text-muted">
           <p>LycanForge — Trading name of Lycan Technical and Engineering Services. CAC: 9364181</p>
           <div className="flex items-center gap-6">
-            <a href="https://x.com/LycanXx0" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">X (Twitter)</a>
-            <a href="https://www.linkedin.com/in/mohammad-bello/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">LinkedIn</a>
-            <a href="https://github.com/Lycan-Xx" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">GitHub</a>
+            <a href="https://x.com/LycanXx0" target="_blank" rel="noopener noreferrer" className="hover:text-text-primary transition-colors">X (Twitter)</a>
+            <a href="https://www.linkedin.com/in/mohammad-bello/" target="_blank" rel="noopener noreferrer" className="hover:text-text-primary transition-colors">LinkedIn</a>
+            <a href="https://github.com/Lycan-Xx" target="_blank" rel="noopener noreferrer" className="hover:text-text-primary transition-colors">GitHub</a>
           </div>
         </div>
       </div>

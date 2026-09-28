@@ -33,8 +33,8 @@ export default function NavBar() {
     >
       <div className="max-w-[1180px] mx-auto px-6 lg:px-10 flex items-center justify-between">
         {/* Logo */}
-        <Link to="/" className="font-display text-xl font-bold tracking-tight text-white group">
-          Lycan<span className="text-accent group-hover:text-white transition-colors">Forge</span>
+        <Link to="/" className="font-display text-xl font-medium tracking-tight text-text-primary group">
+          Lycan<span className="text-accent group-hover:opacity-60 transition-opacity">Forge</span>
         </Link>
 
         {/* Desktop Nav - Alien Pill System */}
@@ -46,7 +46,7 @@ export default function NavBar() {
               opacity: scrolled ? 1 : 0,
               scale: scrolled ? 1 : 0.95
             }}
-            className="absolute inset-y-[-8px] inset-x-[-12px] bg-bg-surface/80 backdrop-blur-xl border border-bg-border rounded-full -z-10 shadow-xl shadow-black/20"
+            className="absolute inset-y-[-8px] inset-x-[-12px] bg-bg-surface/85 backdrop-blur-xl border border-bg-border rounded-full -z-10 shadow-[0_12px_36px_rgba(34,42,28,0.08)]"
           />
 
           <ul className="flex items-center">
@@ -83,7 +83,7 @@ export default function NavBar() {
         {/* Mobile Menu Toggle */}
         <button 
           onClick={() => setMobileMenuOpen(true)}
-          className="md:hidden p-2 text-text-secondary hover:text-white transition-colors"
+          className="md:hidden p-2 text-text-secondary hover:text-text-primary transition-colors"
         >
           <Icon icon="material-symbols:menu-rounded" className="w-8 h-8" />
         </button>
@@ -100,7 +100,7 @@ export default function NavBar() {
             className="fixed inset-0 bg-bg-base z-50 flex flex-col p-8"
           >
             <div className="flex items-center justify-between mb-12">
-              <Link to="/" onClick={() => setMobileMenuOpen(false)} className="font-display text-xl font-bold text-white">
+              <Link to="/" onClick={() => setMobileMenuOpen(false)} className="font-display text-xl font-medium text-text-primary">
                 LycanForge
               </Link>
               <button onClick={() => setMobileMenuOpen(false)} className="p-2 text-text-secondary">
@@ -115,7 +115,7 @@ export default function NavBar() {
                   to={link.path}
                   onClick={() => setMobileMenuOpen(false)}
                   className={({ isActive }) => cn(
-                    "font-display text-4xl text-text-secondary font-bold hover:text-white transition-colors",
+                    "font-display text-4xl text-text-secondary font-medium hover:text-text-primary transition-colors",
                     isActive && "text-accent"
                   )}
                 >
@@ -127,7 +127,7 @@ export default function NavBar() {
             <div className="mt-auto pt-8 border-t border-bg-border">
               <p className="text-text-muted text-xs uppercase tracking-widest font-mono mb-4">Direct Links</p>
               <div className="flex flex-col gap-3">
-                <a href="mailto:client@lycanforge.com.ng" className="text-text-secondary hover:text-white transition-colors">client@lycanforge.com.ng</a>
+                <a href="mailto:client@lycanforge.com.ng" className="text-text-secondary hover:text-text-primary transition-colors">client@lycanforge.com.ng</a>
                 <a href="https://wa.me/2347058392920" className="text-accent hover:text-accent-dim transition-colors">WhatsApp Direct</a>
               </div>
             </div>

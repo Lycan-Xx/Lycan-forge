@@ -13,7 +13,7 @@ export default function SectionHeader({ number, title, subtitle, className }: Se
       <p className="font-mono text-accent text-xs uppercase tracking-[0.14em] font-medium">
         {number} — {title.toUpperCase()}
       </p>
-      <h2 className="text-3xl md:text-4xl text-white">
+      <h2 className="text-3xl md:text-4xl text-text-primary">
         {subtitle || title}
       </h2>
     </div>

@@ -5,7 +5,9 @@ import { useEffect, useState } from 'react';
  * Returns true if user has prefers-reduced-motion enabled
  */
 export const useReducedMotion = () => {
-  const [prefersReduced, setPrefersReduced] = useState(false);
+  const [prefersReduced, setPrefersReduced] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -34,7 +36,9 @@ export const useReducedMotion = () => {
  * Hook to detect if user is on mobile device
  */
 export const useIsMobile = () => {
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768
+  );
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Icon } from '@iconify/react';
+import { Link } from 'react-router-dom';
+import { motion } from 'motion/react';
 
 interface Project {
   id: string;
@@ -12,104 +13,49 @@ interface Project {
   textForward?: boolean;
 }
 
-/**
- * ProjectCard — homepage teaser variant
- *
- * Fixes vs. the original inline JSX:
- * 1. Mobile always shows name + top tag (no hover needed on touch devices)
- * 2. `textForward` projects (currently just kugal-jobs) render info as a
- *    persistent bottom bar instead of hover-only — respects the flag that
- *    was already in the data but never consumed
- * 3. Skeleton placeholder while the image loads, so the bento grid doesn't
- *    show blank/white tiles while WebGL + images are both initializing
- */
 export default function ProjectCard({ project }: { project: Project }) {
   const [loaded, setLoaded] = useState(false);
-  const primaryTag = project.tags[0];
 
   return (
-    <div
-      className={`${project.gridSpan} ${project.height} rounded-lg overflow-hidden group cursor-pointer pointer-events-auto relative bg-bg-raised`}
-      role="article"
-      tabIndex={0}
+    <motion.article
+      layout
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 12 }}
+      className={`${project.gridSpan} editorial-panel group overflow-hidden p-2`}
     >
-      {/* Skeleton — visible until image reports loaded */}
-      {!loaded && (
-        <div className="absolute inset-0 bg-gradient-to-br from-bg-raised to-bg-surface animate-pulse" />
-      )}
-
-      <img
-        src={project.image}
-        alt={project.name}
-        loading="lazy"
-        onLoad={() => setLoaded(true)}
-        className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-105 group-focus:scale-105 ${
-          loaded ? 'opacity-100' : 'opacity-0'
-        }`}
-      />
-
-      {/* textForward cards: info bar always visible (any breakpoint) */}
-      {project.textForward ? (
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-6 flex flex-col justify-end">
-          <h3 className="text-2xl font-display font-medium text-white mb-2">{project.name}</h3>
-          <p className="text-text-secondary text-sm mb-3">{project.oneLiner}</p>
-          <div className="flex flex-wrap gap-2">
-            {project.tags.map((tag) => (
-              <span key={tag} className="text-xs font-mono text-accent bg-accent/10 px-2 py-1 rounded">
-                {tag}
-              </span>
-            ))}
-          </div>
+      <Link to={`/work/${project.id}`} className="block rounded-[18px] focus:outline-none" aria-label={`View ${project.name} case study`}>
+        <div className={`relative overflow-hidden rounded-[18px] bg-bg-raised ${project.height.includes('360') ? 'h-[280px] md:h-[360px]' : 'h-[300px] md:h-[420px]'}`}>
+          {!loaded && <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-bg-raised to-bg-surface" />}
+          <img
+            src={project.image}
+            alt=""
+            loading="lazy"
+            onLoad={() => setLoaded(true)}
+            className={`h-full w-full object-cover transition duration-500 group-hover:scale-[1.025] ${loaded ? 'opacity-100' : 'opacity-0'}`}
+          />
         </div>
-      ) : (
-        <>
-          {/* Mobile: persistent minimal bar (name + primary tag only) */}
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-4 flex items-center justify-between md:hidden">
-            <span className="text-base font-display font-medium text-white">{project.name}</span>
-            <span className="text-[10px] font-mono text-accent bg-accent/10 px-2 py-1 rounded">
-              {primaryTag}
-            </span>
-          </div>
 
-          {/* Desktop: full hover reveal, unchanged from original behavior */}
-          <div className="hidden md:flex absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-300 flex-col justify-end p-6">
-            <h3 className="text-2xl font-display font-medium text-white mb-2">{project.name}</h3>
-            <p className="text-text-secondary text-sm mb-4">{project.oneLiner}</p>
-            <div className="flex flex-wrap gap-2">
-              {project.tags.map((tag) => (
-                <span key={tag} className="text-xs font-mono text-accent bg-accent/10 px-2 py-1 rounded">
-                  {tag}
-                </span>
-              ))}
-            </div>
+        <div className="flex items-start justify-between gap-5 px-3 pb-3 pt-4 md:px-4 md:pb-4">
+          <div>
+            <p className="eyebrow mb-2">{project.tags.slice(0, 2).join(' · ')}</p>
+            <h2 className="text-2xl leading-tight">{project.name}</h2>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-text-secondary">{project.oneLiner}</p>
           </div>
-        </>
-      )}
-    </div>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-bg-border bg-bg-raised transition-transform group-hover:-translate-y-1" aria-hidden="true">↗</span>
+        </div>
+      </Link>
+    </motion.article>
   );
 }
 
-/**
- * Drop-in replacement for the grid block inside HtmlOverlay.tsx's
- * "Section 3: Portfolio Teaser". Uses all 5 projects, fills every
- * row's 12 columns exactly, and closes on the full-width open-source
- * project as a strong final beat:
- *
- * Row 1: studywise (7) + abkhd (5)       = 12
- * Row 2: jalolink (7)  + kugal-jobs (5)  = 12
- * Row 3: resumeforge (12)                = 12
- */
 export function ProjectGrid({ projects }: { projects: Project[] }) {
   const order = ['studywise', 'abkhd', 'jalolink', 'kugal-jobs', 'resumeforge'];
-  const ordered = order
-    .map((id) => projects.find((p) => p.id === id))
-    .filter(Boolean) as Project[];
+  const ordered = order.map((id) => projects.find((project) => project.id === id)).filter(Boolean) as Project[];
 
   return (
-    <div className="grid grid-cols-12 gap-6 mb-12">
-      {ordered.map((project) => (
-        <ProjectCard key={project.id} project={project} />
-      ))}
+    <div className="grid grid-cols-12 gap-6">
+      {ordered.map((project) => <ProjectCard key={project.id} project={project} />)}
     </div>
   );
 }

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import SectionHeader from '../components/ui/SectionHeader';
 import ProjectCard from '../components/work/ProjectCard';
 import { PROJECTS } from '../constants';
 
@@ -24,36 +23,30 @@ export default function Work() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="bg-bg-base pt-40 pb-32"
+      className="min-h-screen bg-bg-base pb-24 pt-32 md:pb-32 md:pt-40"
     >
       <div className="max-w-[1180px] mx-auto px-6 lg:px-10">
-        <header className="mb-20 space-y-6">
-          <p className="font-mono text-accent text-xs uppercase tracking-widest font-medium">OUR WORK</p>
-          <h1 className="text-4xl md:text-5xl text-white font-display">
-            Projects built<br />and shipped.
+        <header className="mb-14 max-w-3xl space-y-6 md:mb-20">
+          <p className="eyebrow">Our work</p>
+          <h1 className="text-5xl leading-[0.92] md:text-7xl">
+            Products made useful.
           </h1>
-          <p className="text-text-secondary max-w-sm">
+          <p className="max-w-xl text-text-secondary">
             Every project listed here is real, delivered, and available for reference on request.
           </p>
         </header>
 
         {/* Filter Tabs */}
-        <div className="flex flex-wrap gap-8 border-b border-bg-border mb-12">
+        <div className="mb-10 flex flex-wrap gap-2 md:mb-12">
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
-              className={`pb-4 text-sm font-medium transition-all relative ${
-                activeCategory === cat ? 'text-accent' : 'text-text-muted hover:text-text-secondary'
+              className={`relative rounded-full border px-4 py-2 text-sm font-medium transition-all ${
+                activeCategory === cat ? 'border-accent bg-accent text-bg-surface' : 'border-bg-border bg-bg-surface/60 text-text-secondary hover:border-text-primary/25'
               }`}
             >
               {cat}
-              {activeCategory === cat && (
-                <motion.div 
-                  layoutId="activeTab"
-                  className="absolute bottom-0 left-0 right-0 h-[2px] bg-accent" 
-                />
-              )}
             </button>
           ))}
         </div>

@@ -5,7 +5,7 @@
 
 export const ANIMATION_CONFIG = {
   scroll: {
-    pages: 5,
+    pages: 6,
     damping: 0.25,
     distance: 1,
   },
@@ -41,32 +41,32 @@ export const ANIMATION_CONFIG = {
   sections: {
     brand: {
       start: 0,
-      end: 0.25,
+      end: 0.16,
       speed: 0.005,
       rotationSpeed: 0.005,
     },
     values: {
-      start: 0.25,
-      end: 0.5,
+      start: 0.16,
+      end: 0.34,
       floatSpeed: 1.5,
       floatIntensity: 2,
     },
     services: {
-      start: 0.5,
-      end: 0.75,
+      start: 0.34,
+      end: 0.52,
       speed: 2,
     },
     portfolio: {
-      start: 0.75,
-      end: 0.88,
+      start: 0.52,
+      end: 0.66,
       speed: 1,
     },
     gallery: {
-      start: 0.85,
-      end: 0.95,
+      start: 0.66,
+      end: 0.9,
     },
     cta: {
-      start: 0.95,
+      start: 0.9,
       end: 1.0,
     },
   },
@@ -83,7 +83,7 @@ export const ANIMATION_CONFIG = {
     directional1: { 
       position: [10, 10, 5] as [number, number, number], 
       intensity: 2, 
-      color: '#eb5e1e' 
+      color: '#22112e'
     },
     directional2: { 
       position: [-10, 0, -5] as [number, number, number], 
