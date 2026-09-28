@@ -15,7 +15,7 @@ export default function HtmlOverlay({ activeProjectId, onProjectActivate }: Html
     <main className="w-full text-text-primary" aria-label="LycanForge introduction">
       <section className="relative flex h-screen w-full flex-col px-5 py-6 md:px-10 md:py-8" aria-labelledby="brand-title">
         <header className="pointer-events-auto flex items-center justify-between text-xs font-medium">
-          <a href="/" className="tracking-tight">LycanForge</a>
+          <a href="/" className="font-display text-xl font-medium tracking-tight">Lycan<span className="text-accent">Forge</span></a>
           <nav aria-label="Landing navigation" className="hidden items-center gap-6 md:flex">
             <a href="/about" className="hover:opacity-60">About</a>
             <a href="/work" className="hover:opacity-60">Work</a>
