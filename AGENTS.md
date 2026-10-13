@@ -39,7 +39,9 @@ npm run build
 - `src/pages/Home.tsx`: owns WebGL detection, reduced-motion fallback, canvas setup, project selection, and route navigation from the canvas.
 - `src/components/canvas/Scene.tsx`: all R3F scene objects and per-frame behavior.
 - `src/components/home3D/HtmlOverlay.tsx`: accessible DOM content laid over the scroll-controlled canvas.
-- `src/config/animationConfig.ts`: scroll ranges and shared animation configuration.
+- `src/config/animationConfig.ts`: derived scroll layout (`SCROLL_LAYOUT`), scroll ranges and shared animation configuration.
+- `src/utils/gallerySequence.ts`: pure scroll-to-project sequence math shared by the scene and overlay.
+- `api/contact.ts`: Vercel serverless function that emails contact-form enquiries via Resend (see Contact form below).
 - `src/constants.ts`: canonical project and service content. Project IDs are route IDs.
 - `src/index.css`: design tokens, global styling, and shared component classes.
 - `src/pages/Work.tsx` and `src/components/work/ProjectCard.tsx`: conventional project index.
@@ -49,21 +51,25 @@ npm run build
 
 ## Home-page interaction contract
 
-The home page uses six `ScrollControls` pages. Keep the DOM sections and the scene ranges synchronized:
+The home page is one `ScrollControls` journey. Its length is **derived**, not hard-coded: `createScrollLayout()` in `src/config/animationConfig.ts` builds `SCROLL_LAYOUT` from `PROJECTS.length`. Measured in pages (1 page = one viewport height):
 
-1. Brand/hero: `0.00–0.16`
-2. Principles: `0.16–0.34`
-3. Capabilities: `0.34–0.52`
-4. Selected-work transition: `0.52–0.66`
-5. Interactive project gallery: `0.66–0.90`
-6. Contact CTA: `0.90–1.00`
+1. Brand/hero: pages `0–1`
+2. Principles: `1–2`
+3. Capabilities: `2–3`
+4. Selected-work transition ("Proof, not promises."): `3–4`
+5. Pinned project stage ("Choose a case study."): starts at `galleryStart` (4) and stays pinned for `pin` pages (one page of scroll per project step plus a short end dwell)
+6. Contact CTA: arrives as the released stage scrolls away (`ctaStart`)
 
-`Home` owns `activeProjectId`. Both `Scene` and `HtmlOverlay` consume it. A project selection in either layer must update the other layer. The interaction rules are:
+Adding or removing a project in `PROJECTS` lengthens or shortens the pinned stage automatically; `ANIMATION_CONFIG.sections.*` ranges are converted from page positions with `at()`.
 
-- Desktop: card proximity creates restrained tilt and forward movement; hover activates a card; click opens `/work/:id`.
-- Mobile: the active card is centered in a horizontal spatial deck; visible previous/next controls change the active card; no essential action depends on hover.
-- Keyboard: numbered project controls are real buttons, expose `aria-pressed`, activate on focus, and each selected project has a normal link.
-- Reduced motion or unavailable WebGL: render `HtmlOverlay` as a static DOM journey instead of mounting the canvas.
+`Home` owns `activeProjectId`. Both `Scene` and `HtmlOverlay` consume it. Scroll position is the source of truth for which project is focused:
+
+- `getGalleryState(scrollPages)` in `src/utils/gallerySequence.ts` is the single scroll-to-sequence function. Both the 3D scene and the DOM overlay call it with the same damped offset (`scroll.offset * (scroll.pages - 1)`), so they cannot disagree.
+- Cards "hold, glide, hold" (`dwellEase`): scrolling is never hijacked, but each project settles before the next one arrives.
+- Desktop: DOM column pinned on the left (title, details, numbered buttons); 3D cards ride a vertical track on the right and slide up one at a time. Pointer tilt applies to the focused card only; hover does **not** change the selection; click opens `/work/:id`.
+- Mobile: title pinned at top, details panel at the bottom, the card crossfades with a short slide in the band between them. No essential action depends on hover.
+- Numbered buttons scroll to that project (they do not just highlight it). They are real buttons with `aria-pressed`; the focused project always has a normal link.
+- Reduced motion or unavailable WebGL: render `HtmlOverlay variant="static"`, a DOM version using native `position: sticky` and plain images. Same selection logic, no canvas.
 
 ## Important rendering rules
 
@@ -74,6 +80,14 @@ The home page uses six `ScrollControls` pages. Keep the DOM sections and the sce
 - Dispose or unmount new geometries, materials, textures, listeners, and timers correctly.
 - Keep image delivery transformed through Cloudinary (`f_auto,q_auto,w_1000`) unless a specific view needs another size.
 - Treat console errors, infinite `useFrame` invalidation, and idle GPU work as regressions.
+
+## Scroll layer warning: CSS `sticky` does not work inside `<Scroll html>`
+
+Drei renders `<Scroll html>` into an `overflow: hidden` container and moves the whole layer with `translate3d(0, -offset * (pages - 1) * height)` every frame. Nothing in it scrolls natively, so `position: sticky` has no effect. The project stage is pinned by counter-translating it by the pinned distance (`ScrollProjectSpace` in `HtmlOverlay.tsx`). Related rules:
+
+- Inside the scroll variant a page must be `h-full` (= the canvas height Drei scrolls by), never `h-screen`, or mobile browser toolbars make DOM and 3D drift apart. The static variant uses `h-screen` because it lives in normal document flow.
+- Native `scrollTop` maps onto the 0..1 offset over `scrollHeight - clientHeight`, which is one page longer than `pages - 1`. To jump to a position, convert through the offset (see `scrollToProject`), never `page * clientHeight`.
+- `useFrame`, `useThree` and `useScroll` work inside `<Scroll html>` because Drei forwards R3F's context into that root.
 
 ## Router boundary warning
 
@@ -102,8 +116,7 @@ Reuse `.editorial-panel`, `.eyebrow`, `.cta-pill`, and `.ghost-pill` before intr
 
 - `PROJECTS` in `src/constants.ts` is the single source of truth for the 3D gallery, work listing, and detail pages.
 - Every project must have a unique stable `id`; its detail URL is `/work/<id>`.
-- Do not reorder or add projects without checking both desktop constellation positions and the mobile active-index deck.
-- If project count becomes dynamic, replace the desktop hard-coded five-position layout in `getGalleryLayout`.
+- Projects can be added, removed or reordered freely: card positions and the pinned scroll length are derived from the index and `PROJECTS.length` (`getTrackLayout`, `createScrollLayout`).
 - Unknown project IDs currently fall back through `ProjectDetail`; preserve or improve that behavior deliberately.
 
 ## Accessibility and resilience
@@ -123,3 +136,11 @@ Reuse `.editorial-panel`, `.eyebrow`, `.cta-pill`, and `.ghost-pill` before intr
 - Do not mass-format the repository or change line endings as part of an unrelated task.
 - Update `CONTEXT.md` after material architectural, visual, performance, or interaction changes so the next agent receives an accurate handoff.
 
+## Contact form
+
+`src/pages/Contact.tsx` POSTs JSON to `/api/contact` (`api/contact.ts`), which sends through Resend to `client@lycanforge.com.ng`; Cloudflare Email Routing forwards that address to the owner's inbox. `Reply-To` is the visitor.
+
+- Server-only env vars (Vercel dashboard): `RESEND_API_KEY` (required), optional `CONTACT_TO`, `CONTACT_FROM`. Never prefix with `VITE_`.
+- The sending domain must be verified in Resend (DNS records added in Cloudflare, "DNS only"). Keep the Cloudflare Email Routing MX/SPF records intact.
+- `vite dev` does not serve `/api`; test the form with `vercel dev`, or accept the error state locally.
+- The form shows success only on an HTTP 200 from the endpoint and shows an error with WhatsApp/email fallbacks otherwise. A hidden `website` honeypot field is silently rejected server-side.

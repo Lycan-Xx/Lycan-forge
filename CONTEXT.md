@@ -1,5 +1,13 @@
 # LycanForge Current Context
 
+## Latest update (2026-10-13): sticky split "Selected work" + working contact form
+
+- **Selected work redesign.** The project section is now a pinned split-scroll stage. Left: "Choose a case study." plus the focused project's details and numbered buttons (pinned). Right: 3D cards on a vertical track; each scroll step slides the next project up, the details follow whichever is centred, and after the last project the stage releases and "Ready to build?" scrolls in. Mobile stacks the same pieces (title top, card crossfade in the middle, details bottom). Reduced-motion/no-WebGL uses `HtmlOverlay variant="static"` with native sticky and DOM images.
+- **How it works.** `SCROLL_LAYOUT` (derived from `PROJECTS.length`) defines the scroll geometry; `getGalleryState()` converts scroll to card progress for both layers; the DOM stage is pinned by counter-translate because CSS sticky cannot work inside Drei's `<Scroll html>` (details in `AGENTS.md`). `Home` no longer passes `onProjectActivate` to `Scene`; scroll drives selection.
+- **Contact form.** Previously simulated (`setTimeout` + `console.log`). Now `api/contact.ts` (Vercel function, Resend) emails `client@lycanforge.com.ng`, which Cloudflare routes onward. Needs `RESEND_API_KEY` in Vercel and a verified Resend sending domain.
+- **Cleanup in the same change.** Removed the unused `@google/genai` dependency and the `define` that injected `GEMINI_API_KEY` into the client bundle; `vercel.json` rewrite now excludes `/api/`.
+- **Verified:** `tsc --noEmit`, `vite build`, sequence-math checks, API handler tests with a mocked Resend, and headless-Chromium scroll tests (desktop 1440x900, mobile 390x844, reduced-motion fallback) with stubbed images. **Not yet verified:** real project images, real devices/touch momentum, a live Resend send.
+
 Last updated: 2026-09-22
 
 This is the active handoff for the current uncommitted rebuild. Read `AGENTS.md` first for durable project rules.

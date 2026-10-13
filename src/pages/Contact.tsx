@@ -45,6 +45,13 @@ export default function Contact() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [details, setDetails] = useState({ name: '', email: '', phone: '', message: '' });
+  const [honeypot, setHoneypot] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const labelFor = (stepId: string) => {
+    const step = steps.find((s) => s.id === stepId);
+    return step?.options.find((o) => o.id === answers[stepId])?.label ?? '';
+  };
 
   const handleOptionSelect = (stepId: string, optionId: string) => {
     setAnswers({ ...answers, [stepId]: optionId });
@@ -57,31 +64,40 @@ export default function Contact() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setIsSubmitting(true);
-    
-    // Structured data for simulated email
-    const emailPayload = {
-      subject: `New Project Enquiry: ${details.name}`,
-      body: `
-        Name: ${details.name}
-        Email: ${details.email}
-        Phone: ${details.phone}
-        
-        Requirements:
-        - Needs: ${answers.needs}
-        - Budget: ${answers.budget}
-        - Timeline: ${answers.timeline}
-        
-        Message:
-        ${details.message}
-      `
-    };
-    console.log("Simulating email send to client@lycanforge.com.ng:", emailPayload);
+    setSubmitError(null);
 
-    // Simulate API call
-    await new Promise(r => setTimeout(r, 2000));
-    setIsSubmitting(false);
-    setIsSuccess(true);
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: details.name,
+          email: details.email,
+          phone: details.phone,
+          message: details.message,
+          needs: labelFor('needs'),
+          budget: labelFor('budget'),
+          timeline: labelFor('timeline'),
+          website: honeypot,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(response.status === 429 ? 'rate_limited' : 'send_failed');
+      }
+
+      setIsSuccess(true);
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error && error.message === 'rate_limited'
+          ? 'Too many attempts from this connection. Please wait a few minutes, or reach us on WhatsApp.'
+          : 'Your message could not be sent. Please try again, or reach us directly on WhatsApp or by email.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const progress = ((currentStep + 1) / (steps.length + 1)) * 100;
@@ -204,7 +220,32 @@ export default function Contact() {
                           />
                         </div>
 
-                        <button 
+                        {/* Honeypot: hidden from people, tempting to bots */}
+                        <div className="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden="true">
+                          <label>
+                            Website
+                            <input
+                              type="text"
+                              name="website"
+                              tabIndex={-1}
+                              autoComplete="off"
+                              value={honeypot}
+                              onChange={(e) => setHoneypot(e.target.value)}
+                            />
+                          </label>
+                        </div>
+
+                        {submitError && (
+                          <div role="alert" className="rounded-xl border border-bg-border bg-bg-surface p-4 text-sm text-text-secondary">
+                            <p>{submitError}</p>
+                            <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                              <a href="https://wa.me/2347058392920" className="text-accent hover:underline">Message on WhatsApp</a>
+                              <a href="mailto:client@lycanforge.com.ng" className="text-accent hover:underline">client@lycanforge.com.ng</a>
+                            </p>
+                          </div>
+                        )}
+
+                        <button
                           disabled={isSubmitting}
                           className="cta-pill w-full flex items-center justify-center gap-3 disabled:opacity-50"
                         >

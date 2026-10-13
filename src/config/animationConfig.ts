@@ -2,10 +2,48 @@
  * Centralized animation configuration
  * Eliminates magic numbers and makes adjustments easier
  */
+import { PROJECTS } from '../constants';
+
+/**
+ * Scroll geometry, measured in "pages" (1 page = one viewport height of scrolling).
+ *
+ *   0 .. 4            hero, principles, capabilities, work transition (1 page each)
+ *   galleryStart ..   the pinned project stage: one page of scroll per project step,
+ *                     plus a short dwell on the last project before it releases
+ *   ctaStart          "Ready to build?" arrives as the stage scrolls away
+ *
+ * Everything below is derived from the project count, so adding or removing a project
+ * automatically lengthens or shortens the pinned stage and keeps the 3D scene synced.
+ */
+export function createScrollLayout(projectCount: number) {
+  const count = Math.max(projectCount, 1);
+  const leadPages = 4;
+  const travel = count - 1; // pages of scroll between the first and last project
+  const endDwell = 0.4; // extra pages the last project stays pinned
+  const pin = travel + endDwell; // total pages the stage stays pinned
+  const galleryStart = leadPages;
+  const pinEnd = galleryStart + pin;
+  const ctaStart = pinEnd + 1; // the released stage needs one page to scroll out
+  return {
+    count,
+    travel,
+    pin,
+    galleryStart,
+    pinEnd,
+    ctaStart,
+    sectionPages: 1 + pin, // height of the gallery section in pages
+    pages: ctaStart + 1, // value for <ScrollControls pages>
+  };
+}
+
+export const SCROLL_LAYOUT = createScrollLayout(PROJECTS.length);
+
+/** Convert a scroll position in pages to ScrollControls' 0..1 offset. */
+const at = (page: number) => page / (SCROLL_LAYOUT.pages - 1);
 
 export const ANIMATION_CONFIG = {
   scroll: {
-    pages: 6,
+    pages: SCROLL_LAYOUT.pages,
     damping: 0.25,
     distance: 1,
   },
@@ -40,33 +78,33 @@ export const ANIMATION_CONFIG = {
   
   sections: {
     brand: {
-      start: 0,
-      end: 0.16,
+      start: at(0),
+      end: at(0.8),
       speed: 0.005,
       rotationSpeed: 0.005,
     },
     values: {
-      start: 0.16,
-      end: 0.34,
+      start: at(0.8),
+      end: at(1.7),
       floatSpeed: 1.5,
       floatIntensity: 2,
     },
     services: {
-      start: 0.34,
-      end: 0.52,
+      start: at(1.7),
+      end: at(2.6),
       speed: 2,
     },
     portfolio: {
-      start: 0.52,
-      end: 0.66,
+      start: at(2.6),
+      end: at(3.3),
       speed: 1,
     },
     gallery: {
-      start: 0.66,
-      end: 0.9,
+      start: at(3.3),
+      end: at(SCROLL_LAYOUT.ctaStart),
     },
     cta: {
-      start: 0.9,
+      start: at(SCROLL_LAYOUT.pinEnd + 0.5),
       end: 1.0,
     },
   },
