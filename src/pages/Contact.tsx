@@ -85,7 +85,8 @@ export default function Contact() {
       });
 
       if (!response.ok) {
-        throw new Error(response.status === 429 ? 'rate_limited' : 'send_failed');
+        const result = await response.json().catch(() => null) as { error?: string } | null;
+        throw new Error(result?.error ?? 'send_failed');
       }
 
       setIsSuccess(true);
@@ -93,6 +94,8 @@ export default function Contact() {
       setSubmitError(
         error instanceof Error && error.message === 'rate_limited'
           ? 'Too many attempts from this connection. Please wait a few minutes, or reach us on WhatsApp.'
+          : error instanceof Error && error.message === 'invalid_input'
+            ? 'Please enter your name, a valid email address, and a message of at least 5 characters.'
           : 'Your message could not be sent. Please try again, or reach us directly on WhatsApp or by email.',
       );
     } finally {
