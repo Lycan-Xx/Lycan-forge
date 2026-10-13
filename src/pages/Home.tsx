@@ -53,7 +53,7 @@ function StaticLanding({
       <p className="fixed right-4 top-4 z-10 rounded-full border border-bg-border bg-bg-base/90 px-3 py-2 text-xs text-text-secondary backdrop-blur-sm">
         {message}
       </p>
-      <HtmlOverlay activeProjectId={activeProjectId} onProjectActivate={onProjectActivate} />
+      <HtmlOverlay variant="static" activeProjectId={activeProjectId} onProjectActivate={onProjectActivate} />
     </div>
   );
 }
@@ -137,9 +137,9 @@ export default function Home() {
             damping={ANIMATION_CONFIG.scroll.damping}
             distance={ANIMATION_CONFIG.scroll.distance}
           >
-            <Scene activeProjectId={activeProjectId} onProjectActivate={activateProject} onProjectOpen={openProject} />
-            <Scroll html style={{ width: '100%' }}>
-              <HtmlOverlay activeProjectId={activeProjectId} onProjectActivate={activateProject} />
+            <Scene activeProjectId={activeProjectId} onProjectOpen={openProject} />
+            <Scroll html style={{ width: '100%', height: '100%' }}>
+              <HtmlOverlay variant="scroll" activeProjectId={activeProjectId} onProjectActivate={activateProject} />
             </Scroll>
           </ScrollControls>
         </Canvas>

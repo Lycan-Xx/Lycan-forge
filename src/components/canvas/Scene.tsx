@@ -5,11 +5,11 @@ import * as easing from 'maath/easing';
 import * as THREE from 'three';
 import { PROJECTS } from '../../constants';
 import { ANIMATION_CONFIG, getSectionProgress } from '../../config/animationConfig';
+import { getGalleryState } from '../../utils/gallerySequence';
 import { useIsMobile } from '../../utils/motionPreferences';
 
 interface SceneProps {
   activeProjectId: string;
-  onProjectActivate: (projectId: string) => void;
   onProjectOpen: (projectId: string) => void;
 }
 
@@ -106,88 +106,95 @@ function CapabilitiesScene() {
   );
 }
 
-function getProjectDimensions(project: typeof PROJECTS[number], isMobile: boolean) {
-  if (isMobile) return { width: 3.25, height: 2.2 };
-  const width = project.gridSpan.includes('col-span-7') ? 2.85 : 2.55;
-  return { width, height: project.height.includes('360') ? 1.75 : 1.95 };
+interface TrackLayout {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** World-space distance between consecutive project cards on the vertical track. */
+  spacing: number;
 }
 
-function getGalleryLayout(
-  viewport: { width: number; height: number },
-  isMobile: boolean,
-  activeIndex: number,
-): Position[] {
+/**
+ * Cards ride a single vertical track. Desktop: the track sits in the right half of the
+ * screen, opposite the pinned DOM column. Mobile: centred, above the details bar.
+ */
+function getTrackLayout(viewport: { width: number; height: number }, isMobile: boolean): TrackLayout {
   if (isMobile) {
-    const spacing = Math.max(3.9, viewport.width * 0.88);
-    return PROJECTS.map((_, index) => [
-      (index - activeIndex) * spacing,
-      -0.15,
-      -Math.abs(index - activeIndex) * 1.25,
-    ]);
+    const width = Math.min(viewport.width * 0.88, 4.4);
+    // Short travel + crossfade: the band between the heading and the details panel is
+    // narrow, so cards slide a little and fade instead of sweeping across the screen.
+    return { x: 0, y: 0.55, width, height: width * 0.66, spacing: 2.1 };
   }
-
-  const x = Math.min(viewport.width * 0.28, 3.65);
-  const y = Math.min(viewport.height * 0.2, 1.75);
-  return [
-    [-x, y * 0.78, -0.55],
-    [0, y * 1.05, 0],
-    [x, y * 0.45, -0.85],
-    [-x * 0.58, -y, -0.1],
-    [x * 0.62, -y * 1.04, -0.45],
-  ];
+  const width = Math.min(viewport.width * 0.4, 6.4);
+  return { x: viewport.width * 0.23, y: -0.1, width, height: width * 0.64, spacing: viewport.height * 0.8 };
 }
 
 function FloatingProjectCard({
   project,
-  position,
   index,
-  galleryReveal,
+  layout,
+  trackRef,
   active,
   isMobile,
-  onActivate,
   onOpen,
 }: {
   project: typeof PROJECTS[number];
-  position: Position;
   index: number;
-  galleryReveal: { current: number };
+  layout: TrackLayout;
+  trackRef: { current: number };
   active: boolean;
   isMobile: boolean;
-  onActivate: () => void;
   onOpen: () => void;
 }) {
   const anchorRef = useRef<THREE.Group>(null);
   const interactionRef = useRef<THREE.Group>(null);
+  const imageRef = useRef<THREE.Mesh>(null);
+  const backingMaterialRef = useRef<THREE.MeshStandardMaterial>(null);
   const worldPosition = useRef(new THREE.Vector3());
   const projectedPosition = useRef(new THREE.Vector3());
-  const { width, height } = getProjectDimensions(project, isMobile);
+  const { width, height } = layout;
 
   useFrame((state, delta) => {
-    if (!anchorRef.current || !interactionRef.current) return;
+    const anchor = anchorRef.current;
+    const interaction = interactionRef.current;
+    if (!anchor || !interaction) return;
 
-    const reveal = clamp01((galleryReveal.current - index * 0.035) / 0.84);
-    const floatY = Math.sin(state.clock.elapsedTime * 0.72 + index * 1.37) * (isMobile ? 0.045 : 0.085);
+    // Distance (in cards) from the centre of the track. Cards far off-stage are culled.
+    const offset = index - trackRef.current;
+    anchor.visible = Math.abs(offset) < 1.25;
+    if (!anchor.visible) return;
 
-    interactionRef.current.getWorldPosition(worldPosition.current);
-    projectedPosition.current.copy(worldPosition.current).project(state.camera);
-    const dx = state.pointer.x - projectedPosition.current.x;
-    const dy = state.pointer.y - projectedPosition.current.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    const proximity = isMobile ? 0 : clamp01(1 - (distance - 0.06) / 0.46) * reveal;
+    // Mobile crossfade: fully opaque when centred, gone before the neighbouring slot.
+    const fade = isMobile ? 1 - THREE.MathUtils.smoothstep(Math.abs(offset), 0.25, 0.85) : 1;
+    if (backingMaterialRef.current) backingMaterialRef.current.opacity = fade;
+    if (imageRef.current) (imageRef.current.material as THREE.Material).opacity = fade;
 
-    easing.damp3(
-      anchorRef.current.position,
-      [position[0], position[1] + floatY * reveal, position[2] + proximity * 0.42 + (1 - reveal) * 4],
-      0.2,
-      delta,
-    );
+    const floatY = Math.sin(state.clock.elapsedTime * 0.72 + index * 1.37) * (isMobile ? 0.04 : 0.07);
+    // Next project sits below and slides up as scroll progresses.
+    anchor.position.set(layout.x, layout.y - offset * layout.spacing + floatY, 0);
+
+    // Pointer tilt: desktop, focused card only.
+    let proximity = 0;
+    let dx = 0;
+    let dy = 0;
+    if (!isMobile && active) {
+      interaction.getWorldPosition(worldPosition.current);
+      projectedPosition.current.copy(worldPosition.current).project(state.camera);
+      dx = state.pointer.x - projectedPosition.current.x;
+      dy = state.pointer.y - projectedPosition.current.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      proximity = clamp01(1 - (distance - 0.06) / 0.5);
+    }
+
     easing.dampE(
-      interactionRef.current.rotation,
+      interaction.rotation,
       [-dy * 0.16 * proximity, dx * 0.23 * proximity, -dx * 0.025 * proximity],
       0.16,
       delta,
     );
-    easing.damp3(interactionRef.current.scale, reveal * (active ? 1.045 : 0.96), 0.18, delta);
+    easing.damp3(interaction.position, [0, 0, proximity * 0.4], 0.2, delta);
+    easing.damp3(interaction.scale, active ? 1 : 0.94, 0.18, delta);
   });
 
   const handleClick = (event: ThreeEvent<MouseEvent>) => {
@@ -198,13 +205,15 @@ function FloatingProjectCard({
   };
 
   return (
-    <group ref={anchorRef}>
-      <group ref={interactionRef} scale={0}>
+    <group ref={anchorRef} visible={false}>
+      <group ref={interactionRef} scale={0.94}>
         <RoundedBox args={[width + 0.2, height + 0.34, 0.12]} radius={0.14} position={[0, -0.08, 0]}>
-          <meshStandardMaterial color={active ? '#f3f1dd' : '#e8e9d1'} roughness={0.9} />
+          <meshStandardMaterial ref={backingMaterialRef} color={active ? '#f3f1dd' : '#e8e9d1'} roughness={0.9} transparent />
         </RoundedBox>
         <DreiImage
+          ref={imageRef}
           url={project.image}
+          transparent
           scale={[width, height]}
           position={[0, 0.09, 0.08]}
           radius={0.09}
@@ -217,7 +226,6 @@ function FloatingProjectCard({
             if (target instanceof HTMLElement && target.closest('a, button')) return;
             event.stopPropagation();
             document.body.style.cursor = 'pointer';
-            onActivate();
           }}
           onPointerMove={(event) => {
             const target = event.nativeEvent.target;
@@ -234,27 +242,31 @@ function FloatingProjectCard({
   );
 }
 
-function FloatingProjectGallery({ activeProjectId, onProjectActivate, onProjectOpen }: SceneProps) {
+function FloatingProjectGallery({ activeProjectId, onProjectOpen }: SceneProps) {
   const scroll = useScroll();
   const viewport = useThree((state) => state.viewport);
   const isMobile = useIsMobile();
   const rootRef = useRef<THREE.Group>(null);
-  const revealRef = useRef(0);
-  const activeIndex = Math.max(0, PROJECTS.findIndex((project) => project.id === activeProjectId));
-  const positions = useMemo(
-    () => getGalleryLayout(viewport, isMobile, activeIndex),
-    [viewport.width, viewport.height, isMobile, activeIndex],
+  // Eased card position along the track, shared with every card (updated once per frame).
+  const trackRef = useRef(0);
+  const layout = useMemo(
+    () => getTrackLayout(viewport, isMobile),
+    [viewport.width, viewport.height, isMobile],
   );
 
-  useFrame((state, delta) => {
-    const section = ANIMATION_CONFIG.sections.gallery;
-    const enter = getSectionProgress(scroll.offset, section.start, section.start + 0.075);
-    const exit = getSectionProgress(scroll.offset, section.end - 0.035, section.end);
-    const visibility = enter * (1 - exit);
-    revealRef.current = THREE.MathUtils.damp(revealRef.current, visibility, 7, delta);
+  useFrame((state) => {
+    const root = rootRef.current;
+    if (!root) return;
 
-    if (rootRef.current) rootRef.current.visible = revealRef.current > 0.004;
-    if (visibility > 0.001 || revealRef.current > 0.005) state.invalidate();
+    const scrollPages = scroll.offset * (scroll.pages - 1);
+    const gallery = getGalleryState(scrollPages);
+    trackRef.current = gallery.eased;
+
+    // The track travels with the page: it rises into view with the pinned DOM stage,
+    // holds while pinned, then scrolls away upward when the stage is released.
+    root.position.y = (gallery.release - gallery.leadIn) * viewport.height;
+    root.visible = gallery.leadIn < 0.999 && gallery.release < 0.999;
+    if (root.visible) state.invalidate();
   });
 
   return (
@@ -263,12 +275,11 @@ function FloatingProjectGallery({ activeProjectId, onProjectActivate, onProjectO
         <FloatingProjectCard
           key={project.id}
           project={project}
-          position={positions[index]}
           index={index}
-          galleryReveal={revealRef}
+          layout={layout}
+          trackRef={trackRef}
           active={project.id === activeProjectId}
           isMobile={isMobile}
-          onActivate={() => onProjectActivate(project.id)}
           onOpen={() => onProjectOpen(project.id)}
         />
       ))}
