@@ -1,0 +1,1898 @@
+From 9c71fecc6238d42bbd0c750468a49578e6589e22 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 13 Oct 2026 03:09:12 +0100
+Subject: [PATCH] feat: working contact API and sticky split-scroll Selected
+ Work
+
+Contact form
+- Add api/contact.ts (Vercel function) that emails enquiries via Resend to
+  client@lycanforge.com.ng with Reply-To set to the visitor; honeypot,
+  validation, HTML escaping and best-effort rate limiting
+- Contact page now POSTs to /api/contact, shows success only on 200 and an
+  error with WhatsApp/email fallbacks otherwise
+- vercel.json rewrite excludes /api/
+- Remove unused @google/genai and the define that injected GEMINI_API_KEY
+  into the client bundle
+
+Selected Work
+- Pinned split layout: details/title stay left, 3D cards slide up one at a
+  time on the right, stage releases into the CTA after the last project
+- Scroll layout derived from PROJECTS.length (SCROLL_LAYOUT); shared
+  getGalleryState() drives both the 3D scene and the DOM overlay
+- Stage pinned by counter-translate (CSS sticky cannot work in Drei's
+  Scroll html); numbered buttons jump to a project
+- Mobile crossfade track; static fallback uses native sticky + DOM images
+- Update AGENTS.md and CONTEXT.md
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01R9LrUiDVxWtawUNDGUJAwV
+---
+ .env.example                          |  16 +-
+ AGENTS.md                             |  51 +++-
+ CONTEXT.md                            |   8 +
+ api/contact.ts                        | 167 +++++++++++
+ package-lock.json                     | 389 +-------------------------
+ package.json                          |   1 -
+ src/components/canvas/Scene.tsx       | 161 ++++++-----
+ src/components/home3D/HtmlOverlay.tsx | 294 +++++++++++++++----
+ src/config/animationConfig.ts         |  62 +++-
+ src/index.css                         |  16 ++
+ src/pages/Contact.tsx                 |  89 ++++--
+ src/pages/Home.tsx                    |   8 +-
+ src/utils/gallerySequence.ts          |  53 ++++
+ vercel.json                           |   2 +-
+ vite.config.ts                        |   8 +-
+ 15 files changed, 738 insertions(+), 587 deletions(-)
+ create mode 100644 api/contact.ts
+ create mode 100644 src/utils/gallerySequence.ts
+
+diff --git a/.env.example b/.env.example
+index 7a550fe..28a9e8e 100644
+--- a/.env.example
++++ b/.env.example
+@@ -1,9 +1,9 @@
+-# GEMINI_API_KEY: Required for Gemini AI API calls.
+-# AI Studio automatically injects this at runtime from user secrets.
+-# Users configure this via the Secrets panel in the AI Studio UI.
+-GEMINI_API_KEY="MY_GEMINI_API_KEY"
++# Server-side only. Set these in Vercel -> Project -> Settings -> Environment Variables.
++# Never prefix with VITE_ (that would expose the value in the browser bundle).
+ 
+-# APP_URL: The URL where this applet is hosted.
+-# AI Studio automatically injects this at runtime with the Cloud Run service URL.
+-# Used for self-referential links, OAuth callbacks, and API endpoints.
+-APP_URL="MY_APP_URL"
++# Resend API key used by api/contact.ts to email contact-form enquiries.
++RESEND_API_KEY="re_xxxxxxxxxxxxxxxx"
++
++# Optional overrides (defaults shown). CONTACT_FROM's domain must be verified in Resend.
++# CONTACT_TO="client@lycanforge.com.ng"
++# CONTACT_FROM="LycanForge Website <noreply@lycanforge.com.ng>"
+diff --git a/AGENTS.md b/AGENTS.md
+index e8e19a6..c0d7433 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -39,7 +39,9 @@ npm run build
+ - `src/pages/Home.tsx`: owns WebGL detection, reduced-motion fallback, canvas setup, project selection, and route navigation from the canvas.
+ - `src/components/canvas/Scene.tsx`: all R3F scene objects and per-frame behavior.
+ - `src/components/home3D/HtmlOverlay.tsx`: accessible DOM content laid over the scroll-controlled canvas.
+-- `src/config/animationConfig.ts`: scroll ranges and shared animation configuration.
++- `src/config/animationConfig.ts`: derived scroll layout (`SCROLL_LAYOUT`), scroll ranges and shared animation configuration.
++- `src/utils/gallerySequence.ts`: pure scroll-to-project sequence math shared by the scene and overlay.
++- `api/contact.ts`: Vercel serverless function that emails contact-form enquiries via Resend (see Contact form below).
+ - `src/constants.ts`: canonical project and service content. Project IDs are route IDs.
+ - `src/index.css`: design tokens, global styling, and shared component classes.
+ - `src/pages/Work.tsx` and `src/components/work/ProjectCard.tsx`: conventional project index.
+@@ -49,21 +51,25 @@ npm run build
+ 
+ ## Home-page interaction contract
+ 
+-The home page uses six `ScrollControls` pages. Keep the DOM sections and the scene ranges synchronized:
++The home page is one `ScrollControls` journey. Its length is **derived**, not hard-coded: `createScrollLayout()` in `src/config/animationConfig.ts` builds `SCROLL_LAYOUT` from `PROJECTS.length`. Measured in pages (1 page = one viewport height):
+ 
+-1. Brand/hero: `0.00–0.16`
+-2. Principles: `0.16–0.34`
+-3. Capabilities: `0.34–0.52`
+-4. Selected-work transition: `0.52–0.66`
+-5. Interactive project gallery: `0.66–0.90`
+-6. Contact CTA: `0.90–1.00`
++1. Brand/hero: pages `0–1`
++2. Principles: `1–2`
++3. Capabilities: `2–3`
++4. Selected-work transition ("Proof, not promises."): `3–4`
++5. Pinned project stage ("Choose a case study."): starts at `galleryStart` (4) and stays pinned for `pin` pages (one page of scroll per project step plus a short end dwell)
++6. Contact CTA: arrives as the released stage scrolls away (`ctaStart`)
+ 
+-`Home` owns `activeProjectId`. Both `Scene` and `HtmlOverlay` consume it. A project selection in either layer must update the other layer. The interaction rules are:
++Adding or removing a project in `PROJECTS` lengthens or shortens the pinned stage automatically; `ANIMATION_CONFIG.sections.*` ranges are converted from page positions with `at()`.
+ 
+-- Desktop: card proximity creates restrained tilt and forward movement; hover activates a card; click opens `/work/:id`.
+-- Mobile: the active card is centered in a horizontal spatial deck; visible previous/next controls change the active card; no essential action depends on hover.
+-- Keyboard: numbered project controls are real buttons, expose `aria-pressed`, activate on focus, and each selected project has a normal link.
+-- Reduced motion or unavailable WebGL: render `HtmlOverlay` as a static DOM journey instead of mounting the canvas.
++`Home` owns `activeProjectId`. Both `Scene` and `HtmlOverlay` consume it. Scroll position is the source of truth for which project is focused:
++
++- `getGalleryState(scrollPages)` in `src/utils/gallerySequence.ts` is the single scroll-to-sequence function. Both the 3D scene and the DOM overlay call it with the same damped offset (`scroll.offset * (scroll.pages - 1)`), so they cannot disagree.
++- Cards "hold, glide, hold" (`dwellEase`): scrolling is never hijacked, but each project settles before the next one arrives.
++- Desktop: DOM column pinned on the left (title, details, numbered buttons); 3D cards ride a vertical track on the right and slide up one at a time. Pointer tilt applies to the focused card only; hover does **not** change the selection; click opens `/work/:id`.
++- Mobile: title pinned at top, details panel at the bottom, the card crossfades with a short slide in the band between them. No essential action depends on hover.
++- Numbered buttons scroll to that project (they do not just highlight it). They are real buttons with `aria-pressed`; the focused project always has a normal link.
++- Reduced motion or unavailable WebGL: render `HtmlOverlay variant="static"`, a DOM version using native `position: sticky` and plain images. Same selection logic, no canvas.
+ 
+ ## Important rendering rules
+ 
+@@ -75,6 +81,14 @@ The home page uses six `ScrollControls` pages. Keep the DOM sections and the sce
+ - Keep image delivery transformed through Cloudinary (`f_auto,q_auto,w_1000`) unless a specific view needs another size.
+ - Treat console errors, infinite `useFrame` invalidation, and idle GPU work as regressions.
+ 
++## Scroll layer warning: CSS `sticky` does not work inside `<Scroll html>`
++
++Drei renders `<Scroll html>` into an `overflow: hidden` container and moves the whole layer with `translate3d(0, -offset * (pages - 1) * height)` every frame. Nothing in it scrolls natively, so `position: sticky` has no effect. The project stage is pinned by counter-translating it by the pinned distance (`ScrollProjectSpace` in `HtmlOverlay.tsx`). Related rules:
++
++- Inside the scroll variant a page must be `h-full` (= the canvas height Drei scrolls by), never `h-screen`, or mobile browser toolbars make DOM and 3D drift apart. The static variant uses `h-screen` because it lives in normal document flow.
++- Native `scrollTop` maps onto the 0..1 offset over `scrollHeight - clientHeight`, which is one page longer than `pages - 1`. To jump to a position, convert through the offset (see `scrollToProject`), never `page * clientHeight`.
++- `useFrame`, `useThree` and `useScroll` work inside `<Scroll html>` because Drei forwards R3F's context into that root.
++
+ ## Router boundary warning
+ 
+ Drei's `<Scroll html>` content can be rendered through a separate React root. In this project, React Router's `<Link>` inside `HtmlOverlay` previously crashed because router context was `null`. Therefore:
+@@ -102,8 +116,7 @@ Reuse `.editorial-panel`, `.eyebrow`, `.cta-pill`, and `.ghost-pill` before intr
+ 
+ - `PROJECTS` in `src/constants.ts` is the single source of truth for the 3D gallery, work listing, and detail pages.
+ - Every project must have a unique stable `id`; its detail URL is `/work/<id>`.
+-- Do not reorder or add projects without checking both desktop constellation positions and the mobile active-index deck.
+-- If project count becomes dynamic, replace the desktop hard-coded five-position layout in `getGalleryLayout`.
++- Projects can be added, removed or reordered freely: card positions and the pinned scroll length are derived from the index and `PROJECTS.length` (`getTrackLayout`, `createScrollLayout`).
+ - Unknown project IDs currently fall back through `ProjectDetail`; preserve or improve that behavior deliberately.
+ 
+ ## Accessibility and resilience
+@@ -123,3 +136,11 @@ Reuse `.editorial-panel`, `.eyebrow`, `.cta-pill`, and `.ghost-pill` before intr
+ - Do not mass-format the repository or change line endings as part of an unrelated task.
+ - Update `CONTEXT.md` after material architectural, visual, performance, or interaction changes so the next agent receives an accurate handoff.
+ 
++## Contact form
++
++`src/pages/Contact.tsx` POSTs JSON to `/api/contact` (`api/contact.ts`), which sends through Resend to `client@lycanforge.com.ng`; Cloudflare Email Routing forwards that address to the owner's inbox. `Reply-To` is the visitor.
++
++- Server-only env vars (Vercel dashboard): `RESEND_API_KEY` (required), optional `CONTACT_TO`, `CONTACT_FROM`. Never prefix with `VITE_`.
++- The sending domain must be verified in Resend (DNS records added in Cloudflare, "DNS only"). Keep the Cloudflare Email Routing MX/SPF records intact.
++- `vite dev` does not serve `/api`; test the form with `vercel dev`, or accept the error state locally.
++- The form shows success only on an HTTP 200 from the endpoint and shows an error with WhatsApp/email fallbacks otherwise. A hidden `website` honeypot field is silently rejected server-side.
+diff --git a/CONTEXT.md b/CONTEXT.md
+index 93292da..17b7972 100644
+--- a/CONTEXT.md
++++ b/CONTEXT.md
+@@ -1,5 +1,13 @@
+ # LycanForge Current Context
+ 
++## Latest update (2026-10-13): sticky split "Selected work" + working contact form
++
++- **Selected work redesign.** The project section is now a pinned split-scroll stage. Left: "Choose a case study." plus the focused project's details and numbered buttons (pinned). Right: 3D cards on a vertical track; each scroll step slides the next project up, the details follow whichever is centred, and after the last project the stage releases and "Ready to build?" scrolls in. Mobile stacks the same pieces (title top, card crossfade in the middle, details bottom). Reduced-motion/no-WebGL uses `HtmlOverlay variant="static"` with native sticky and DOM images.
++- **How it works.** `SCROLL_LAYOUT` (derived from `PROJECTS.length`) defines the scroll geometry; `getGalleryState()` converts scroll to card progress for both layers; the DOM stage is pinned by counter-translate because CSS sticky cannot work inside Drei's `<Scroll html>` (details in `AGENTS.md`). `Home` no longer passes `onProjectActivate` to `Scene`; scroll drives selection.
++- **Contact form.** Previously simulated (`setTimeout` + `console.log`). Now `api/contact.ts` (Vercel function, Resend) emails `client@lycanforge.com.ng`, which Cloudflare routes onward. Needs `RESEND_API_KEY` in Vercel and a verified Resend sending domain.
++- **Cleanup in the same change.** Removed the unused `@google/genai` dependency and the `define` that injected `GEMINI_API_KEY` into the client bundle; `vercel.json` rewrite now excludes `/api/`.
++- **Verified:** `tsc --noEmit`, `vite build`, sequence-math checks, API handler tests with a mocked Resend, and headless-Chromium scroll tests (desktop 1440x900, mobile 390x844, reduced-motion fallback) with stubbed images. **Not yet verified:** real project images, real devices/touch momentum, a live Resend send.
++
+ Last updated: 2026-09-22
+ 
+ This is the active handoff for the current uncommitted rebuild. Read `AGENTS.md` first for durable project rules.
+diff --git a/api/contact.ts b/api/contact.ts
+new file mode 100644
+index 0000000..3e8e594
+--- /dev/null
++++ b/api/contact.ts
+@@ -0,0 +1,167 @@
++/**
++ * POST /api/contact
++ *
++ * Vercel serverless function that emails contact-form enquiries through Resend.
++ * Mail is sent TO client@lycanforge.com.ng (Cloudflare Email Routing then forwards
++ * it to the owner's inbox) with Reply-To set to the visitor, so replying in your
++ * mail client answers the enquirer directly.
++ *
++ * Environment variables (set in Vercel -> Project -> Settings -> Environment Variables):
++ *   RESEND_API_KEY  required  Resend API key (server-side only, never VITE_ prefixed)
++ *   CONTACT_TO      optional  defaults to client@lycanforge.com.ng
++ *   CONTACT_FROM    optional  defaults to "LycanForge Website <noreply@lycanforge.com.ng>"
++ *                             (the domain must be verified in Resend)
++ */
++
++interface ApiRequest {
++  method?: string;
++  body?: unknown;
++  headers: Record<string, string | string[] | undefined>;
++  socket?: { remoteAddress?: string };
++}
++
++interface ApiResponse {
++  status(code: number): ApiResponse;
++  json(body: unknown): void;
++  setHeader(name: string, value: string): void;
++}
++
++const DEFAULT_TO = 'client@lycanforge.com.ng';
++const DEFAULT_FROM = 'LycanForge Website <noreply@lycanforge.com.ng>';
++
++const LIMITS = { name: 100, email: 200, phone: 40, message: 5000, choice: 120 };
++const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
++
++// Best-effort per-instance rate limit. Serverless instances are recycled, so this
++// only blunts bursts; the honeypot field does most of the bot filtering.
++const WINDOW_MS = 10 * 60 * 1000;
++const MAX_PER_WINDOW = 5;
++const hits = new Map<string, number[]>();
++
++function rateLimited(ip: string): boolean {
++  const now = Date.now();
++  const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
++  recent.push(now);
++  hits.set(ip, recent);
++  if (hits.size > 500) {
++    for (const [key, times] of hits) {
++      if (times.every((t) => now - t >= WINDOW_MS)) hits.delete(key);
++    }
++  }
++  return recent.length > MAX_PER_WINDOW;
++}
++
++function clientIp(req: ApiRequest): string {
++  const forwarded = req.headers['x-forwarded-for'];
++  const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
++  return raw?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
++}
++
++function text(value: unknown, max: number): string {
++  return typeof value === 'string' ? value.trim().slice(0, max) : '';
++}
++
++function oneLine(value: string): string {
++  return value.replace(/[\r\n]+/g, ' ');
++}
++
++function escapeHtml(value: string): string {
++  return value
++    .replace(/&/g, '&amp;')
++    .replace(/</g, '&lt;')
++    .replace(/>/g, '&gt;')
++    .replace(/"/g, '&quot;')
++    .replace(/'/g, '&#39;');
++}
++
++export default async function handler(req: ApiRequest, res: ApiResponse) {
++  res.setHeader('Cache-Control', 'no-store');
++
++  if (req.method !== 'POST') {
++    res.setHeader('Allow', 'POST');
++    return res.status(405).json({ ok: false, error: 'method_not_allowed' });
++  }
++
++  const body = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as Record<string, unknown>;
++
++  // Honeypot: real visitors never see or fill this field. Pretend success to bots.
++  if (text(body.website, 200)) {
++    return res.status(200).json({ ok: true });
++  }
++
++  const name = text(body.name, LIMITS.name);
++  const email = text(body.email, LIMITS.email);
++  const phone = text(body.phone, LIMITS.phone);
++  const message = text(body.message, LIMITS.message);
++  const needs = text(body.needs, LIMITS.choice) || 'Not specified';
++  const budget = text(body.budget, LIMITS.choice) || 'Not specified';
++  const timeline = text(body.timeline, LIMITS.choice) || 'Not specified';
++
++  if (!name || !EMAIL_PATTERN.test(email) || message.length < 5) {
++    return res.status(400).json({ ok: false, error: 'invalid_input' });
++  }
++
++  if (rateLimited(clientIp(req))) {
++    return res.status(429).json({ ok: false, error: 'rate_limited' });
++  }
++
++  const apiKey = process.env.RESEND_API_KEY;
++  if (!apiKey) {
++    console.error('[contact] RESEND_API_KEY is not configured');
++    return res.status(500).json({ ok: false, error: 'not_configured' });
++  }
++
++  const to = process.env.CONTACT_TO || DEFAULT_TO;
++  const from = process.env.CONTACT_FROM || DEFAULT_FROM;
++  const subject = oneLine(`New enquiry: ${name} - ${needs}`);
++
++  const plain = [
++    `Name: ${name}`,
++    `Email: ${email}`,
++    `Phone: ${phone || 'Not provided'}`,
++    '',
++    'Requirements',
++    `- Looking to build: ${needs}`,
++    `- Budget: ${budget}`,
++    `- Timeline: ${timeline}`,
++    '',
++    'Message',
++    message,
++  ].join('\n');
++
++  const row = (label: string, value: string) =>
++    `<tr><td style="padding:4px 16px 4px 0;color:#707967;vertical-align:top">${label}</td><td style="padding:4px 0">${escapeHtml(value)}</td></tr>`;
++
++  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#11140f;line-height:1.5">
++<h2 style="margin:0 0 12px">New project enquiry</h2>
++<table style="border-collapse:collapse">
++${row('Name', name)}${row('Email', email)}${row('Phone', phone || 'Not provided')}
++${row('Building', needs)}${row('Budget', budget)}${row('Timeline', timeline)}
++</table>
++<h3 style="margin:20px 0 6px">Message</h3>
++<p style="white-space:pre-wrap;margin:0">${escapeHtml(message)}</p>
++<p style="margin-top:24px;color:#707967;font-size:12px">Sent from the lycanforge.com.ng contact form. Reply to this email to answer ${escapeHtml(name)} directly.</p>
++</div>`;
++
++  try {
++    const response = await fetch('https://api.resend.com/emails', {
++      method: 'POST',
++      headers: {
++        Authorization: `Bearer ${apiKey}`,
++        'Content-Type': 'application/json',
++      },
++      body: JSON.stringify({ from, to: [to], reply_to: email, subject, text: plain, html }),
++    });
++
++    if (!response.ok) {
++      const detail = await response.text().catch(() => '');
++      console.error('[contact] Resend rejected the message', response.status, detail);
++      return res.status(502).json({ ok: false, error: 'send_failed' });
++    }
++
++    return res.status(200).json({ ok: true });
++  } catch (error) {
++    console.error('[contact] Could not reach Resend', error);
++    return res.status(502).json({ ok: false, error: 'send_failed' });
++  }
++}
+diff --git a/package-lock.json b/package-lock.json
+index f4c4ff6..bdc2526 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -8,7 +8,6 @@
+       "name": "react-example",
+       "version": "0.0.0",
+       "dependencies": {
+-        "@google/genai": "^1.29.0",
+         "@gsap/react": "^2.1.2",
+         "@iconify/react": "^6.0.2",
+         "@react-three/drei": "^10.7.7",
+@@ -739,30 +738,6 @@
+         "node": ">=18"
+       }
+     },
+-    "node_modules/@google/genai": {
+-      "version": "1.51.0",
+-      "resolved": "https://registry.npmjs.org/@google/genai/-/genai-1.51.0.tgz",
+-      "integrity": "sha512-vTZZF3CSimN7cn2zsLpW2p5WF0eZa5Gz69ITMPCNHpPrDlAstOfGifSfi0p/s9Z9400f7xJRkgvkQNrcM7pJ6w==",
+-      "hasInstallScript": true,
+-      "license": "Apache-2.0",
+-      "dependencies": {
+-        "google-auth-library": "^10.3.0",
+-        "p-retry": "^4.6.2",
+-        "protobufjs": "^7.5.4",
+-        "ws": "^8.18.0"
+-      },
+-      "engines": {
+-        "node": ">=20.0.0"
+-      },
+-      "peerDependencies": {
+-        "@modelcontextprotocol/sdk": "^1.25.2"
+-      },
+-      "peerDependenciesMeta": {
+-        "@modelcontextprotocol/sdk": {
+-          "optional": true
+-        }
+-      }
+-    },
+     "node_modules/@gsap/react": {
+       "version": "2.1.2",
+       "resolved": "https://registry.npmjs.org/@gsap/react/-/react-2.1.2.tgz",
+@@ -857,63 +832,6 @@
+         "three": ">= 0.159.0"
+       }
+     },
+-    "node_modules/@protobufjs/aspromise": {
+-      "version": "1.1.2",
+-      "resolved": "https://registry.npmjs.org/@protobufjs/aspromise/-/aspromise-1.1.2.tgz",
+-      "integrity": "sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ==",
+-      "license": "BSD-3-Clause"
+-    },
+-    "node_modules/@protobufjs/base64": {
+-      "version": "1.1.2",
+-      "resolved": "https://registry.npmjs.org/@protobufjs/base64/-/base64-1.1.2.tgz",
+-      "integrity": "sha512-AZkcAA5vnN/v4PDqKyMR5lx7hZttPDgClv83E//FMNhR2TMcLUhfRUBHCmSl0oi9zMgDDqRUJkSxO3wm85+XLg==",
+-      "license": "BSD-3-Clause"
+-    },
+-    "node_modules/@protobufjs/codegen": {
+-      "version": "2.0.5",
+-      "resolved": "https://registry.npmjs.org/@protobufjs/codegen/-/codegen-2.0.5.tgz",
+-      "integrity": "sha512-zgXFLzW3Ap33e6d0Wlj4MGIm6Ce8O89n/apUaGNB/jx+hw+ruWEp7EwGUshdLKVRCxZW12fp9r40E1mQrf/34g==",
+-      "license": "BSD-3-Clause"
+-    },
+-    "node_modules/@protobufjs/eventemitter": {
+-      "version": "1.1.1",
+-      "resolved": "https://registry.npmjs.org/@protobufjs/eventemitter/-/eventemitter-1.1.1.tgz",
+-      "integrity": "sha512-vW1GmwMZNnL+gMRaovlh9yZX74kc+TTU3FObkkurpMaRtBfLP3ldjS9KQWlwZgraRE0+dheEEoAxdzcJQ8eXZg==",
+-      "license": "BSD-3-Clause"
+-    },
+-    "node_modules/@protobufjs/fetch": {
+-      "version": "1.1.1",
+-      "resolved": "https://registry.npmjs.org/@protobufjs/fetch/-/fetch-1.1.1.tgz",
+-      "integrity": "sha512-GpptLrs57adMSuHi3VNj0mAF8dwh36LMaYF6XyJ6JMWlVsc+t42tm1HSEDmOs3A8fC9yyeisgLhsTVQokOZ0zw==",
+-      "license": "BSD-3-Clause",
+-      "dependencies": {
+-        "@protobufjs/aspromise": "^1.1.1"
+-      }
+-    },
+-    "node_modules/@protobufjs/float": {
+-      "version": "1.0.2",
+-      "resolved": "https://registry.npmjs.org/@protobufjs/float/-/float-1.0.2.tgz",
+-      "integrity": "sha512-Ddb+kVXlXst9d+R9PfTIxh1EdNkgoRe5tOX6t01f1lYWOvJnSPDBlG241QLzcyPdoNTsblLUdujGSE4RzrTZGQ==",
+-      "license": "BSD-3-Clause"
+-    },
+-    "node_modules/@protobufjs/path": {
+-      "version": "1.1.2",
+-      "resolved": "https://registry.npmjs.org/@protobufjs/path/-/path-1.1.2.tgz",
+-      "integrity": "sha512-6JOcJ5Tm08dOHAbdR3GrvP+yUUfkjG5ePsHYczMFLq3ZmMkAD98cDgcT2iA1lJ9NVwFd4tH/iSSoe44YWkltEA==",
+-      "license": "BSD-3-Clause"
+-    },
+-    "node_modules/@protobufjs/pool": {
+-      "version": "1.1.0",
+-      "resolved": "https://registry.npmjs.org/@protobufjs/pool/-/pool-1.1.0.tgz",
+-      "integrity": "sha512-0kELaGSIDBKvcgS4zkjz1PeddatrjYcmMWOlAuAPwAeccUrPHdUqo/J6LiymHHEiJT5NrF1UVwxY14f+fy4WQw==",
+-      "license": "BSD-3-Clause"
+-    },
+-    "node_modules/@protobufjs/utf8": {
+-      "version": "1.1.1",
+-      "resolved": "https://registry.npmjs.org/@protobufjs/utf8/-/utf8-1.1.1.tgz",
+-      "integrity": "sha512-oOAWABowe8EAbMyWKM0tYDKi8Yaox52D+HWZhAIJqQXbqe0xI/GV7FhLWqlEKreMkfDjshR5FKgi3mnle0h6Eg==",
+-      "license": "BSD-3-Clause"
+-    },
+     "node_modules/@react-three/drei": {
+       "version": "10.7.7",
+       "resolved": "https://registry.npmjs.org/@react-three/drei/-/drei-10.7.7.tgz",
+@@ -1798,6 +1716,7 @@
+       "version": "22.19.17",
+       "resolved": "https://registry.npmjs.org/@types/node/-/node-22.19.17.tgz",
+       "integrity": "sha512-wGdMcf+vPYM6jikpS/qhg6WiqSV/OhG+jeeHT/KlVqxYfD40iYJf9/AE1uQxVWFvU7MipKRkRv8NSHiCGgPr8Q==",
++      "devOptional": true,
+       "license": "MIT",
+       "dependencies": {
+         "undici-types": "~6.21.0"
+@@ -1851,12 +1770,6 @@
+         "@types/react": "*"
+       }
+     },
+-    "node_modules/@types/retry": {
+-      "version": "0.12.0",
+-      "resolved": "https://registry.npmjs.org/@types/retry/-/retry-0.12.0.tgz",
+-      "integrity": "sha512-wWKOClTTiizcZhXnPY4wikVAwmdYHp8q6DmC+EJUzAMsycb7HB32Kh9RN4+0gExjmPmZSAQjgURXIGATPegAvA==",
+-      "license": "MIT"
+-    },
+     "node_modules/@types/send": {
+       "version": "1.2.1",
+       "resolved": "https://registry.npmjs.org/@types/send/-/send-1.2.1.tgz",
+@@ -1967,15 +1880,6 @@
+         "node": ">= 0.6"
+       }
+     },
+-    "node_modules/agent-base": {
+-      "version": "7.1.4",
+-      "resolved": "https://registry.npmjs.org/agent-base/-/agent-base-7.1.4.tgz",
+-      "integrity": "sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">= 14"
+-      }
+-    },
+     "node_modules/array-flatten": {
+       "version": "1.1.1",
+       "resolved": "https://registry.npmjs.org/array-flatten/-/array-flatten-1.1.1.tgz",
+@@ -2060,15 +1964,6 @@
+         "require-from-string": "^2.0.2"
+       }
+     },
+-    "node_modules/bignumber.js": {
+-      "version": "9.3.1",
+-      "resolved": "https://registry.npmjs.org/bignumber.js/-/bignumber.js-9.3.1.tgz",
+-      "integrity": "sha512-Ko0uX15oIUS7wJ3Rb30Fs6SkVbLmPBAKdlm7q9+ak9bbIeFf0MwuBsQV6z7+X768/cHsfg+WlysDWJcmthjsjQ==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": "*"
+-      }
+-    },
+     "node_modules/body-parser": {
+       "version": "1.20.5",
+       "resolved": "https://registry.npmjs.org/body-parser/-/body-parser-1.20.5.tgz",
+@@ -2165,12 +2060,6 @@
+         "ieee754": "^1.2.1"
+       }
+     },
+-    "node_modules/buffer-equal-constant-time": {
+-      "version": "1.0.1",
+-      "resolved": "https://registry.npmjs.org/buffer-equal-constant-time/-/buffer-equal-constant-time-1.0.1.tgz",
+-      "integrity": "sha512-zRpUiDwd/xk6ADqPMATG8vc9VPrkck7T07OIx0gnjmJAnHnTVXNQG3vfvWNuiZIkwu9KrKdA1iJKfsfTVxE6NA==",
+-      "license": "BSD-3-Clause"
+-    },
+     "node_modules/bytes": {
+       "version": "3.1.2",
+       "resolved": "https://registry.npmjs.org/bytes/-/bytes-3.1.2.tgz",
+@@ -2331,15 +2220,6 @@
+       "integrity": "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==",
+       "license": "MIT"
+     },
+-    "node_modules/data-uri-to-buffer": {
+-      "version": "4.0.1",
+-      "resolved": "https://registry.npmjs.org/data-uri-to-buffer/-/data-uri-to-buffer-4.0.1.tgz",
+-      "integrity": "sha512-0R9ikRb668HB7QDxT1vkpuUBtqc53YyAwMwGeUFKRojY/NWKvdZ+9UYtRfGmhqNbRkTSVpMbmyhXipFFv2cb/A==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">= 12"
+-      }
+-    },
+     "node_modules/debug": {
+       "version": "4.4.3",
+       "resolved": "https://registry.npmjs.org/debug/-/debug-4.4.3.tgz",
+@@ -2426,15 +2306,6 @@
+         "node": ">= 0.4"
+       }
+     },
+-    "node_modules/ecdsa-sig-formatter": {
+-      "version": "1.0.11",
+-      "resolved": "https://registry.npmjs.org/ecdsa-sig-formatter/-/ecdsa-sig-formatter-1.0.11.tgz",
+-      "integrity": "sha512-nagl3RYrbNv6kQkeJIpt6NJZy8twLB/2vtz6yN9Z4vRKHN4/QZJIEbqohALSgwKdnksuY3k5Addp5lg8sVoVcQ==",
+-      "license": "Apache-2.0",
+-      "dependencies": {
+-        "safe-buffer": "^5.0.1"
+-      }
+-    },
+     "node_modules/ee-first": {
+       "version": "1.1.1",
+       "resolved": "https://registry.npmjs.org/ee-first/-/ee-first-1.1.1.tgz",
+@@ -2626,12 +2497,6 @@
+       "integrity": "sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A==",
+       "license": "MIT"
+     },
+-    "node_modules/extend": {
+-      "version": "3.0.2",
+-      "resolved": "https://registry.npmjs.org/extend/-/extend-3.0.2.tgz",
+-      "integrity": "sha512-fjquC59cD7CyW6urNXK0FBufkZcoiGG80wTuPujX590cB5Ttln20E2UB4S/WARVqhXffZl2LNgS+gQdPIIim/g==",
+-      "license": "MIT"
+-    },
+     "node_modules/fdir": {
+       "version": "6.5.0",
+       "resolved": "https://registry.npmjs.org/fdir/-/fdir-6.5.0.tgz",
+@@ -2649,29 +2514,6 @@
+         }
+       }
+     },
+-    "node_modules/fetch-blob": {
+-      "version": "3.2.0",
+-      "resolved": "https://registry.npmjs.org/fetch-blob/-/fetch-blob-3.2.0.tgz",
+-      "integrity": "sha512-7yAQpD2UMJzLi1Dqv7qFYnPbaPx7ZfFK6PiIxQ4PfkGPyNyl2Ugx+a/umUonmKqjhM4DnfbMvdX6otXq83soQQ==",
+-      "funding": [
+-        {
+-          "type": "github",
+-          "url": "https://github.com/sponsors/jimmywarting"
+-        },
+-        {
+-          "type": "paypal",
+-          "url": "https://paypal.me/jimmywarting"
+-        }
+-      ],
+-      "license": "MIT",
+-      "dependencies": {
+-        "node-domexception": "^1.0.0",
+-        "web-streams-polyfill": "^3.0.3"
+-      },
+-      "engines": {
+-        "node": "^12.20 || >= 14.13"
+-      }
+-    },
+     "node_modules/fflate": {
+       "version": "0.8.2",
+       "resolved": "https://registry.npmjs.org/fflate/-/fflate-0.8.2.tgz",
+@@ -2711,18 +2553,6 @@
+       "integrity": "sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A==",
+       "license": "MIT"
+     },
+-    "node_modules/formdata-polyfill": {
+-      "version": "4.0.10",
+-      "resolved": "https://registry.npmjs.org/formdata-polyfill/-/formdata-polyfill-4.0.10.tgz",
+-      "integrity": "sha512-buewHzMvYL29jdeQTVILecSaZKnt/RJWjoZCF5OW60Z67/GmSLBkOFM7qh1PI3zFNtJbaZL5eQu1vLfazOwj4g==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "fetch-blob": "^3.1.2"
+-      },
+-      "engines": {
+-        "node": ">=12.20.0"
+-      }
+-    },
+     "node_modules/forwarded": {
+       "version": "0.2.0",
+       "resolved": "https://registry.npmjs.org/forwarded/-/forwarded-0.2.0.tgz",
+@@ -2805,34 +2635,6 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
+-    "node_modules/gaxios": {
+-      "version": "7.1.4",
+-      "resolved": "https://registry.npmjs.org/gaxios/-/gaxios-7.1.4.tgz",
+-      "integrity": "sha512-bTIgTsM2bWn3XklZISBTQX7ZSddGW+IO3bMdGaemHZ3tbqExMENHLx6kKZ/KlejgrMtj8q7wBItt51yegqalrA==",
+-      "license": "Apache-2.0",
+-      "dependencies": {
+-        "extend": "^3.0.2",
+-        "https-proxy-agent": "^7.0.1",
+-        "node-fetch": "^3.3.2"
+-      },
+-      "engines": {
+-        "node": ">=18"
+-      }
+-    },
+-    "node_modules/gcp-metadata": {
+-      "version": "8.1.2",
+-      "resolved": "https://registry.npmjs.org/gcp-metadata/-/gcp-metadata-8.1.2.tgz",
+-      "integrity": "sha512-zV/5HKTfCeKWnxG0Dmrw51hEWFGfcF2xiXqcA3+J90WDuP0SvoiSO5ORvcBsifmx/FoIjgQN3oNOGaQ5PhLFkg==",
+-      "license": "Apache-2.0",
+-      "dependencies": {
+-        "gaxios": "^7.0.0",
+-        "google-logging-utils": "^1.0.0",
+-        "json-bigint": "^1.0.0"
+-      },
+-      "engines": {
+-        "node": ">=18"
+-      }
+-    },
+     "node_modules/gensync": {
+       "version": "1.0.0-beta.2",
+       "resolved": "https://registry.npmjs.org/gensync/-/gensync-1.0.0-beta.2.tgz",
+@@ -2898,32 +2700,6 @@
+       "integrity": "sha512-b/ZCF6amfAUb7dJM/MxRs7AetQEahYzJ8PtgfrmEdtw6uyGOr+ZSGtgjFm6mfsBkxJ4d2W7kg+Nlqzqvn3Bc0w==",
+       "license": "MIT"
+     },
+-    "node_modules/google-auth-library": {
+-      "version": "10.6.2",
+-      "resolved": "https://registry.npmjs.org/google-auth-library/-/google-auth-library-10.6.2.tgz",
+-      "integrity": "sha512-e27Z6EThmVNNvtYASwQxose/G57rkRuaRbQyxM2bvYLLX/GqWZ5chWq2EBoUchJbCc57eC9ArzO5wMsEmWftCw==",
+-      "license": "Apache-2.0",
+-      "dependencies": {
+-        "base64-js": "^1.3.0",
+-        "ecdsa-sig-formatter": "^1.0.11",
+-        "gaxios": "^7.1.4",
+-        "gcp-metadata": "8.1.2",
+-        "google-logging-utils": "1.1.3",
+-        "jws": "^4.0.0"
+-      },
+-      "engines": {
+-        "node": ">=18"
+-      }
+-    },
+-    "node_modules/google-logging-utils": {
+-      "version": "1.1.3",
+-      "resolved": "https://registry.npmjs.org/google-logging-utils/-/google-logging-utils-1.1.3.tgz",
+-      "integrity": "sha512-eAmLkjDjAFCVXg7A1unxHsLf961m6y17QFqXqAXGj/gVkKFrEICfStRfwUlGNfeCEjNRa32JEWOUTlYXPyyKvA==",
+-      "license": "Apache-2.0",
+-      "engines": {
+-        "node": ">=14"
+-      }
+-    },
+     "node_modules/gopd": {
+       "version": "1.2.0",
+       "resolved": "https://registry.npmjs.org/gopd/-/gopd-1.2.0.tgz",
+@@ -2998,19 +2774,6 @@
+         "url": "https://opencollective.com/express"
+       }
+     },
+-    "node_modules/https-proxy-agent": {
+-      "version": "7.0.6",
+-      "resolved": "https://registry.npmjs.org/https-proxy-agent/-/https-proxy-agent-7.0.6.tgz",
+-      "integrity": "sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "agent-base": "^7.1.2",
+-        "debug": "4"
+-      },
+-      "engines": {
+-        "node": ">= 14"
+-      }
+-    },
+     "node_modules/iconv-lite": {
+       "version": "0.4.24",
+       "resolved": "https://registry.npmjs.org/iconv-lite/-/iconv-lite-0.4.24.tgz",
+@@ -3115,15 +2878,6 @@
+         "node": ">=6"
+       }
+     },
+-    "node_modules/json-bigint": {
+-      "version": "1.0.0",
+-      "resolved": "https://registry.npmjs.org/json-bigint/-/json-bigint-1.0.0.tgz",
+-      "integrity": "sha512-SiPv/8VpZuWbvLSMtTDU8hEfrZWg/mH/nV/b4o0CYbSxu1UIQPLdwKOCIyLQX+VIPO5vrLX3i8qtqFyhdPSUSQ==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "bignumber.js": "^9.0.0"
+-      }
+-    },
+     "node_modules/json5": {
+       "version": "2.2.3",
+       "resolved": "https://registry.npmjs.org/json5/-/json5-2.2.3.tgz",
+@@ -3136,27 +2890,6 @@
+         "node": ">=6"
+       }
+     },
+-    "node_modules/jwa": {
+-      "version": "2.0.1",
+-      "resolved": "https://registry.npmjs.org/jwa/-/jwa-2.0.1.tgz",
+-      "integrity": "sha512-hRF04fqJIP8Abbkq5NKGN0Bbr3JxlQ+qhZufXVr0DvujKy93ZCbXZMHDL4EOtodSbCWxOqR8MS1tXA5hwqCXDg==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "buffer-equal-constant-time": "^1.0.1",
+-        "ecdsa-sig-formatter": "1.0.11",
+-        "safe-buffer": "^5.0.1"
+-      }
+-    },
+-    "node_modules/jws": {
+-      "version": "4.0.1",
+-      "resolved": "https://registry.npmjs.org/jws/-/jws-4.0.1.tgz",
+-      "integrity": "sha512-EKI/M/yqPncGUUh44xz0PxSidXFr/+r0pA70+gIYhjv+et7yxM+s29Y+VGDkovRofQem0fs7Uvf4+YmAdyRduA==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "jwa": "^2.0.1",
+-        "safe-buffer": "^5.0.1"
+-      }
+-    },
+     "node_modules/lie": {
+       "version": "3.3.0",
+       "resolved": "https://registry.npmjs.org/lie/-/lie-3.3.0.tgz",
+@@ -3415,12 +3148,6 @@
+         "url": "https://opencollective.com/parcel"
+       }
+     },
+-    "node_modules/long": {
+-      "version": "5.3.2",
+-      "resolved": "https://registry.npmjs.org/long/-/long-5.3.2.tgz",
+-      "integrity": "sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA==",
+-      "license": "Apache-2.0"
+-    },
+     "node_modules/lru-cache": {
+       "version": "5.1.1",
+       "resolved": "https://registry.npmjs.org/lru-cache/-/lru-cache-5.1.1.tgz",
+@@ -3626,44 +3353,6 @@
+         "node": ">= 0.6"
+       }
+     },
+-    "node_modules/node-domexception": {
+-      "version": "1.0.0",
+-      "resolved": "https://registry.npmjs.org/node-domexception/-/node-domexception-1.0.0.tgz",
+-      "integrity": "sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==",
+-      "deprecated": "Use your platform's native DOMException instead",
+-      "funding": [
+-        {
+-          "type": "github",
+-          "url": "https://github.com/sponsors/jimmywarting"
+-        },
+-        {
+-          "type": "github",
+-          "url": "https://paypal.me/jimmywarting"
+-        }
+-      ],
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">=10.5.0"
+-      }
+-    },
+-    "node_modules/node-fetch": {
+-      "version": "3.3.2",
+-      "resolved": "https://registry.npmjs.org/node-fetch/-/node-fetch-3.3.2.tgz",
+-      "integrity": "sha512-dRB78srN/l6gqWulah9SrxeYnxeddIG30+GOqK/9OlLVyLg3HPnr6SqOWTWOXKRwC2eGYCkZ59NNuSgvSrpgOA==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "data-uri-to-buffer": "^4.0.0",
+-        "fetch-blob": "^3.1.4",
+-        "formdata-polyfill": "^4.0.10"
+-      },
+-      "engines": {
+-        "node": "^12.20.0 || ^14.13.1 || >=16.0.0"
+-      },
+-      "funding": {
+-        "type": "opencollective",
+-        "url": "https://opencollective.com/node-fetch"
+-      }
+-    },
+     "node_modules/node-releases": {
+       "version": "2.0.38",
+       "resolved": "https://registry.npmjs.org/node-releases/-/node-releases-2.0.38.tgz",
+@@ -3694,19 +3383,6 @@
+         "node": ">= 0.8"
+       }
+     },
+-    "node_modules/p-retry": {
+-      "version": "4.6.2",
+-      "resolved": "https://registry.npmjs.org/p-retry/-/p-retry-4.6.2.tgz",
+-      "integrity": "sha512-312Id396EbJdvRONlngUx0NydfrIQ5lsYu0znKVUzVvArzEIt08V1qhtyESbGVd1FGX7UKtiFp5uwKZdM8wIuQ==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@types/retry": "0.12.0",
+-        "retry": "^0.13.1"
+-      },
+-      "engines": {
+-        "node": ">=8"
+-      }
+-    },
+     "node_modules/parseurl": {
+       "version": "1.3.3",
+       "resolved": "https://registry.npmjs.org/parseurl/-/parseurl-1.3.3.tgz",
+@@ -3809,29 +3485,6 @@
+         "lie": "^3.0.2"
+       }
+     },
+-    "node_modules/protobufjs": {
+-      "version": "7.6.5",
+-      "resolved": "https://registry.npmjs.org/protobufjs/-/protobufjs-7.6.5.tgz",
+-      "integrity": "sha512-/FPD0nUc9jH6rfFjji9IBqOz4pcSE3CsT1m7Ep6Mdb0LxSUMj8hgl6GomOvZzpNpAqqGaXA0P3VSrZLFzIhQrw==",
+-      "hasInstallScript": true,
+-      "license": "BSD-3-Clause",
+-      "dependencies": {
+-        "@protobufjs/aspromise": "^1.1.2",
+-        "@protobufjs/base64": "^1.1.2",
+-        "@protobufjs/codegen": "^2.0.5",
+-        "@protobufjs/eventemitter": "^1.1.1",
+-        "@protobufjs/fetch": "^1.1.1",
+-        "@protobufjs/float": "^1.0.2",
+-        "@protobufjs/path": "^1.1.2",
+-        "@protobufjs/pool": "^1.1.0",
+-        "@protobufjs/utf8": "^1.1.1",
+-        "@types/node": ">=13.7.0",
+-        "long": "^5.3.2"
+-      },
+-      "engines": {
+-        "node": ">=12.0.0"
+-      }
+-    },
+     "node_modules/proxy-addr": {
+       "version": "2.0.7",
+       "resolved": "https://registry.npmjs.org/proxy-addr/-/proxy-addr-2.0.7.tgz",
+@@ -4000,15 +3653,6 @@
+         "url": "https://github.com/privatenumber/resolve-pkg-maps?sponsor=1"
+       }
+     },
+-    "node_modules/retry": {
+-      "version": "0.13.1",
+-      "resolved": "https://registry.npmjs.org/retry/-/retry-0.13.1.tgz",
+-      "integrity": "sha512-XQBQ3I8W1Cge0Seh+6gjj03LbmRFWuoszgK9ooCpwYIrhhoO80pfq4cUkU5DkknwfOfFteRwlZ56PYOGYyFWdg==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">= 4"
+-      }
+-    },
+     "node_modules/rollup": {
+       "version": "4.60.2",
+       "resolved": "https://registry.npmjs.org/rollup/-/rollup-4.60.2.tgz",
+@@ -4522,6 +4166,7 @@
+       "version": "6.21.0",
+       "resolved": "https://registry.npmjs.org/undici-types/-/undici-types-6.21.0.tgz",
+       "integrity": "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==",
++      "devOptional": true,
+       "license": "MIT"
+     },
+     "node_modules/unpipe": {
+@@ -5130,15 +4775,6 @@
+         "@esbuild/win32-x64": "0.25.12"
+       }
+     },
+-    "node_modules/web-streams-polyfill": {
+-      "version": "3.3.3",
+-      "resolved": "https://registry.npmjs.org/web-streams-polyfill/-/web-streams-polyfill-3.3.3.tgz",
+-      "integrity": "sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">= 8"
+-      }
+-    },
+     "node_modules/webgl-constants": {
+       "version": "1.1.1",
+       "resolved": "https://registry.npmjs.org/webgl-constants/-/webgl-constants-1.1.1.tgz",
+@@ -5165,27 +4801,6 @@
+         "node": ">= 8"
+       }
+     },
+-    "node_modules/ws": {
+-      "version": "8.21.0",
+-      "resolved": "https://registry.npmjs.org/ws/-/ws-8.21.0.tgz",
+-      "integrity": "sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">=10.0.0"
+-      },
+-      "peerDependencies": {
+-        "bufferutil": "^4.0.1",
+-        "utf-8-validate": ">=5.0.2"
+-      },
+-      "peerDependenciesMeta": {
+-        "bufferutil": {
+-          "optional": true
+-        },
+-        "utf-8-validate": {
+-          "optional": true
+-        }
+-      }
+-    },
+     "node_modules/yallist": {
+       "version": "3.1.1",
+       "resolved": "https://registry.npmjs.org/yallist/-/yallist-3.1.1.tgz",
+diff --git a/package.json b/package.json
+index bfd0bec..16e529f 100644
+--- a/package.json
++++ b/package.json
+@@ -11,7 +11,6 @@
+     "lint": "tsc --noEmit"
+   },
+   "dependencies": {
+-    "@google/genai": "^1.29.0",
+     "@gsap/react": "^2.1.2",
+     "@iconify/react": "^6.0.2",
+     "@react-three/drei": "^10.7.7",
+diff --git a/src/components/canvas/Scene.tsx b/src/components/canvas/Scene.tsx
+index 65d2eed..290a12e 100644
+--- a/src/components/canvas/Scene.tsx
++++ b/src/components/canvas/Scene.tsx
+@@ -5,11 +5,11 @@ import * as easing from 'maath/easing';
+ import * as THREE from 'three';
+ import { PROJECTS } from '../../constants';
+ import { ANIMATION_CONFIG, getSectionProgress } from '../../config/animationConfig';
++import { getGalleryState } from '../../utils/gallerySequence';
+ import { useIsMobile } from '../../utils/motionPreferences';
+ 
+ interface SceneProps {
+   activeProjectId: string;
+-  onProjectActivate: (projectId: string) => void;
+   onProjectOpen: (projectId: string) => void;
+ }
+ 
+@@ -106,88 +106,95 @@ function CapabilitiesScene() {
+   );
+ }
+ 
+-function getProjectDimensions(project: typeof PROJECTS[number], isMobile: boolean) {
+-  if (isMobile) return { width: 3.25, height: 2.2 };
+-  const width = project.gridSpan.includes('col-span-7') ? 2.85 : 2.55;
+-  return { width, height: project.height.includes('360') ? 1.75 : 1.95 };
++interface TrackLayout {
++  x: number;
++  y: number;
++  width: number;
++  height: number;
++  /** World-space distance between consecutive project cards on the vertical track. */
++  spacing: number;
+ }
+ 
+-function getGalleryLayout(
+-  viewport: { width: number; height: number },
+-  isMobile: boolean,
+-  activeIndex: number,
+-): Position[] {
++/**
++ * Cards ride a single vertical track. Desktop: the track sits in the right half of the
++ * screen, opposite the pinned DOM column. Mobile: centred, above the details bar.
++ */
++function getTrackLayout(viewport: { width: number; height: number }, isMobile: boolean): TrackLayout {
+   if (isMobile) {
+-    const spacing = Math.max(3.9, viewport.width * 0.88);
+-    return PROJECTS.map((_, index) => [
+-      (index - activeIndex) * spacing,
+-      -0.15,
+-      -Math.abs(index - activeIndex) * 1.25,
+-    ]);
++    const width = Math.min(viewport.width * 0.88, 4.4);
++    // Short travel + crossfade: the band between the heading and the details panel is
++    // narrow, so cards slide a little and fade instead of sweeping across the screen.
++    return { x: 0, y: 0.55, width, height: width * 0.66, spacing: 2.1 };
+   }
+-
+-  const x = Math.min(viewport.width * 0.28, 3.65);
+-  const y = Math.min(viewport.height * 0.2, 1.75);
+-  return [
+-    [-x, y * 0.78, -0.55],
+-    [0, y * 1.05, 0],
+-    [x, y * 0.45, -0.85],
+-    [-x * 0.58, -y, -0.1],
+-    [x * 0.62, -y * 1.04, -0.45],
+-  ];
++  const width = Math.min(viewport.width * 0.4, 6.4);
++  return { x: viewport.width * 0.23, y: -0.1, width, height: width * 0.64, spacing: viewport.height * 0.8 };
+ }
+ 
+ function FloatingProjectCard({
+   project,
+-  position,
+   index,
+-  galleryReveal,
++  layout,
++  trackRef,
+   active,
+   isMobile,
+-  onActivate,
+   onOpen,
+ }: {
+   project: typeof PROJECTS[number];
+-  position: Position;
+   index: number;
+-  galleryReveal: { current: number };
++  layout: TrackLayout;
++  trackRef: { current: number };
+   active: boolean;
+   isMobile: boolean;
+-  onActivate: () => void;
+   onOpen: () => void;
+ }) {
+   const anchorRef = useRef<THREE.Group>(null);
+   const interactionRef = useRef<THREE.Group>(null);
++  const imageRef = useRef<THREE.Mesh>(null);
++  const backingMaterialRef = useRef<THREE.MeshStandardMaterial>(null);
+   const worldPosition = useRef(new THREE.Vector3());
+   const projectedPosition = useRef(new THREE.Vector3());
+-  const { width, height } = getProjectDimensions(project, isMobile);
++  const { width, height } = layout;
+ 
+   useFrame((state, delta) => {
+-    if (!anchorRef.current || !interactionRef.current) return;
+-
+-    const reveal = clamp01((galleryReveal.current - index * 0.035) / 0.84);
+-    const floatY = Math.sin(state.clock.elapsedTime * 0.72 + index * 1.37) * (isMobile ? 0.045 : 0.085);
+-
+-    interactionRef.current.getWorldPosition(worldPosition.current);
+-    projectedPosition.current.copy(worldPosition.current).project(state.camera);
+-    const dx = state.pointer.x - projectedPosition.current.x;
+-    const dy = state.pointer.y - projectedPosition.current.y;
+-    const distance = Math.sqrt(dx * dx + dy * dy);
+-    const proximity = isMobile ? 0 : clamp01(1 - (distance - 0.06) / 0.46) * reveal;
+-
+-    easing.damp3(
+-      anchorRef.current.position,
+-      [position[0], position[1] + floatY * reveal, position[2] + proximity * 0.42 + (1 - reveal) * 4],
+-      0.2,
+-      delta,
+-    );
++    const anchor = anchorRef.current;
++    const interaction = interactionRef.current;
++    if (!anchor || !interaction) return;
++
++    // Distance (in cards) from the centre of the track. Cards far off-stage are culled.
++    const offset = index - trackRef.current;
++    anchor.visible = Math.abs(offset) < 1.25;
++    if (!anchor.visible) return;
++
++    // Mobile crossfade: fully opaque when centred, gone before the neighbouring slot.
++    const fade = isMobile ? 1 - THREE.MathUtils.smoothstep(Math.abs(offset), 0.25, 0.85) : 1;
++    if (backingMaterialRef.current) backingMaterialRef.current.opacity = fade;
++    if (imageRef.current) (imageRef.current.material as THREE.Material).opacity = fade;
++
++    const floatY = Math.sin(state.clock.elapsedTime * 0.72 + index * 1.37) * (isMobile ? 0.04 : 0.07);
++    // Next project sits below and slides up as scroll progresses.
++    anchor.position.set(layout.x, layout.y - offset * layout.spacing + floatY, 0);
++
++    // Pointer tilt: desktop, focused card only.
++    let proximity = 0;
++    let dx = 0;
++    let dy = 0;
++    if (!isMobile && active) {
++      interaction.getWorldPosition(worldPosition.current);
++      projectedPosition.current.copy(worldPosition.current).project(state.camera);
++      dx = state.pointer.x - projectedPosition.current.x;
++      dy = state.pointer.y - projectedPosition.current.y;
++      const distance = Math.sqrt(dx * dx + dy * dy);
++      proximity = clamp01(1 - (distance - 0.06) / 0.5);
++    }
++
+     easing.dampE(
+-      interactionRef.current.rotation,
++      interaction.rotation,
+       [-dy * 0.16 * proximity, dx * 0.23 * proximity, -dx * 0.025 * proximity],
+       0.16,
+       delta,
+     );
+-    easing.damp3(interactionRef.current.scale, reveal * (active ? 1.045 : 0.96), 0.18, delta);
++    easing.damp3(interaction.position, [0, 0, proximity * 0.4], 0.2, delta);
++    easing.damp3(interaction.scale, active ? 1 : 0.94, 0.18, delta);
+   });
+ 
+   const handleClick = (event: ThreeEvent<MouseEvent>) => {
+@@ -198,13 +205,15 @@ function FloatingProjectCard({
+   };
+ 
+   return (
+-    <group ref={anchorRef}>
+-      <group ref={interactionRef} scale={0}>
++    <group ref={anchorRef} visible={false}>
++      <group ref={interactionRef} scale={0.94}>
+         <RoundedBox args={[width + 0.2, height + 0.34, 0.12]} radius={0.14} position={[0, -0.08, 0]}>
+-          <meshStandardMaterial color={active ? '#f3f1dd' : '#e8e9d1'} roughness={0.9} />
++          <meshStandardMaterial ref={backingMaterialRef} color={active ? '#f3f1dd' : '#e8e9d1'} roughness={0.9} transparent />
+         </RoundedBox>
+         <DreiImage
++          ref={imageRef}
+           url={project.image}
++          transparent
+           scale={[width, height]}
+           position={[0, 0.09, 0.08]}
+           radius={0.09}
+@@ -217,7 +226,6 @@ function FloatingProjectCard({
+             if (target instanceof HTMLElement && target.closest('a, button')) return;
+             event.stopPropagation();
+             document.body.style.cursor = 'pointer';
+-            onActivate();
+           }}
+           onPointerMove={(event) => {
+             const target = event.nativeEvent.target;
+@@ -234,27 +242,31 @@ function FloatingProjectCard({
+   );
+ }
+ 
+-function FloatingProjectGallery({ activeProjectId, onProjectActivate, onProjectOpen }: SceneProps) {
++function FloatingProjectGallery({ activeProjectId, onProjectOpen }: SceneProps) {
+   const scroll = useScroll();
+   const viewport = useThree((state) => state.viewport);
+   const isMobile = useIsMobile();
+   const rootRef = useRef<THREE.Group>(null);
+-  const revealRef = useRef(0);
+-  const activeIndex = Math.max(0, PROJECTS.findIndex((project) => project.id === activeProjectId));
+-  const positions = useMemo(
+-    () => getGalleryLayout(viewport, isMobile, activeIndex),
+-    [viewport.width, viewport.height, isMobile, activeIndex],
++  // Eased card position along the track, shared with every card (updated once per frame).
++  const trackRef = useRef(0);
++  const layout = useMemo(
++    () => getTrackLayout(viewport, isMobile),
++    [viewport.width, viewport.height, isMobile],
+   );
+ 
+-  useFrame((state, delta) => {
+-    const section = ANIMATION_CONFIG.sections.gallery;
+-    const enter = getSectionProgress(scroll.offset, section.start, section.start + 0.075);
+-    const exit = getSectionProgress(scroll.offset, section.end - 0.035, section.end);
+-    const visibility = enter * (1 - exit);
+-    revealRef.current = THREE.MathUtils.damp(revealRef.current, visibility, 7, delta);
+-
+-    if (rootRef.current) rootRef.current.visible = revealRef.current > 0.004;
+-    if (visibility > 0.001 || revealRef.current > 0.005) state.invalidate();
++  useFrame((state) => {
++    const root = rootRef.current;
++    if (!root) return;
++
++    const scrollPages = scroll.offset * (scroll.pages - 1);
++    const gallery = getGalleryState(scrollPages);
++    trackRef.current = gallery.eased;
++
++    // The track travels with the page: it rises into view with the pinned DOM stage,
++    // holds while pinned, then scrolls away upward when the stage is released.
++    root.position.y = (gallery.release - gallery.leadIn) * viewport.height;
++    root.visible = gallery.leadIn < 0.999 && gallery.release < 0.999;
++    if (root.visible) state.invalidate();
+   });
+ 
+   return (
+@@ -263,12 +275,11 @@ function FloatingProjectGallery({ activeProjectId, onProjectActivate, onProjectO
+         <FloatingProjectCard
+           key={project.id}
+           project={project}
+-          position={positions[index]}
+           index={index}
+-          galleryReveal={revealRef}
++          layout={layout}
++          trackRef={trackRef}
+           active={project.id === activeProjectId}
+           isMobile={isMobile}
+-          onActivate={() => onProjectActivate(project.id)}
+           onOpen={() => onProjectOpen(project.id)}
+         />
+       ))}
+diff --git a/src/components/home3D/HtmlOverlay.tsx b/src/components/home3D/HtmlOverlay.tsx
+index dbc4a5f..7d44a64 100644
+--- a/src/components/home3D/HtmlOverlay.tsx
++++ b/src/components/home3D/HtmlOverlay.tsx
+@@ -1,19 +1,244 @@
++import { useEffect, useRef } from 'react';
++import { useFrame } from '@react-three/fiber';
++import { useScroll } from '@react-three/drei';
+ import { PROJECTS } from '../../constants';
++import { SCROLL_LAYOUT } from '../../config/animationConfig';
++import { getGalleryState } from '../../utils/gallerySequence';
+ 
+ interface HtmlOverlayProps {
++  /**
++   * 'scroll': rendered inside Drei's <Scroll html> (a transformed layer, so CSS sticky
++   *           cannot work; the project stage is pinned by counter-translating it).
++   * 'static': rendered in normal document flow (no WebGL / reduced motion), where
++   *           native `position: sticky` works.
++   */
++  variant: 'scroll' | 'static';
+   activeProjectId: string;
+   onProjectActivate: (projectId: string) => void;
+ }
+ 
+-export default function HtmlOverlay({ activeProjectId, onProjectActivate }: HtmlOverlayProps) {
++const clamp01 = (value: number) => Math.max(0, Math.min(value, 1));
++
++/* -------------------------------------------------------------------------- */
++/* Shared presentational pieces                                               */
++/* -------------------------------------------------------------------------- */
++
++function ProjectHeading() {
++  return (
++    <div className="pointer-events-none">
++      <p className="eyebrow mb-3">04 · Project space</p>
++      <h2 id="gallery-title" className="text-4xl leading-none md:text-6xl">Choose a case study.</h2>
++    </div>
++  );
++}
++
++function ProjectDetails({
++  activeIndex,
++  onSelect,
++}: {
++  activeIndex: number;
++  onSelect: (index: number) => void;
++}) {
++  const project = PROJECTS[activeIndex];
++
++  return (
++    <article className="editorial-panel pointer-events-auto w-full max-w-2xl p-5 max-md:bg-bg-surface md:max-w-[480px] md:p-7">
++      {/* Keyed so the details re-animate each time the focused project changes. */}
++      <div key={project.id} className="detail-swap">
++        <p className="eyebrow mb-3">
++          {String(activeIndex + 1).padStart(2, '0')} / {String(PROJECTS.length).padStart(2, '0')}
++        </p>
++        <h3 className="text-3xl leading-[0.95] md:text-5xl">{project.name}</h3>
++        <p className="mt-3 text-sm leading-relaxed text-text-secondary md:text-base">{project.oneLiner}</p>
++        <p className="mt-4 hidden min-h-[6.5rem] text-sm leading-relaxed text-text-secondary md:block">{project.description}</p>
++        <ul className="mt-4 hidden flex-wrap gap-2 md:flex" aria-label="Technologies">
++          {project.tags.map((tag) => (
++            <li key={tag} className="rounded-full border border-bg-border px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-text-muted">
++              {tag}
++            </li>
++          ))}
++        </ul>
++        <a
++          href={`/work/${project.id}`}
++          className="cta-pill mt-5 inline-flex items-center gap-2 text-sm"
++          aria-label={`Open ${project.name} case study`}
++        >
++          Open case study <span aria-hidden="true">↗</span>
++        </a>
++      </div>
++
++      <div className="mt-5 flex items-center gap-2 border-t border-bg-border pt-4" role="group" aria-label="Select project">
++        {PROJECTS.map((item, index) => (
++          <button
++            key={item.id}
++            type="button"
++            onClick={() => onSelect(index)}
++            className={`flex h-11 w-11 items-center justify-center rounded-full border text-xs transition-colors ${
++              index === activeIndex
++                ? 'border-accent bg-accent text-bg-surface'
++                : 'border-bg-border bg-bg-raised text-text-secondary hover:border-text-primary/30'
++            }`}
++            aria-label={`Show ${item.name}`}
++            aria-pressed={index === activeIndex}
++          >
++            {index + 1}
++          </button>
++        ))}
++      </div>
++    </article>
++  );
++}
++
++/* -------------------------------------------------------------------------- */
++/* Project stage: scroll variant (pinned by counter-translate)                */
++/* -------------------------------------------------------------------------- */
++
++function ScrollProjectSpace({
++  activeProjectId,
++  onProjectActivate,
++}: Pick<HtmlOverlayProps, 'activeProjectId' | 'onProjectActivate'>) {
++  const scroll = useScroll();
++  const stageRef = useRef<HTMLDivElement>(null);
++  const lastIndex = useRef(0);
+   const activeIndex = Math.max(0, PROJECTS.findIndex((project) => project.id === activeProjectId));
+-  const activeProject = PROJECTS[activeIndex];
+-  const selectPrevious = () => onProjectActivate(PROJECTS[(activeIndex - 1 + PROJECTS.length) % PROJECTS.length].id);
+-  const selectNext = () => onProjectActivate(PROJECTS[(activeIndex + 1) % PROJECTS.length].id);
++
++  useFrame((state) => {
++    const stage = stageRef.current;
++    if (!stage) return;
++
++    // Same damped offset Drei uses to move this whole layer, converted to pages.
++    const scrollPages = scroll.offset * (scroll.pages - 1);
++    const gallery = getGalleryState(scrollPages);
++
++    // The layer is translating upward by `scrollPages`; pushing the stage down by the
++    // pinned amount cancels that out, so it appears fixed until the pin releases.
++    stage.style.transform = `translate3d(0, ${gallery.pinned * state.size.height}px, 0)`;
++
++    // Whichever project is centred drives the shared selection state.
++    if (gallery.index !== lastIndex.current) {
++      lastIndex.current = gallery.index;
++      onProjectActivate(PROJECTS[gallery.index].id);
++    }
++  });
++
++  const scrollToProject = (index: number) => {
++    // Drei maps native scrollTop onto the 0..1 offset over (scrollHeight - clientHeight),
++    // so jump targets go through the offset rather than raw page multiples.
++    const el = scroll.el;
++    const targetOffset = (SCROLL_LAYOUT.galleryStart + index) / (scroll.pages - 1);
++    el.scrollTo({ top: targetOffset * (el.scrollHeight - el.clientHeight), behavior: 'smooth' });
++  };
+ 
+   return (
+-    <main className="w-full text-text-primary" aria-label="LycanForge introduction">
+-      <section className="relative flex h-screen w-full flex-col px-5 py-6 md:px-10 md:py-8" aria-labelledby="brand-title">
++    <section
++      className="relative w-full"
++      style={{ height: `${SCROLL_LAYOUT.sectionPages * 100}%` }}
++      aria-labelledby="gallery-title"
++    >
++      <div
++        ref={stageRef}
++        className="absolute inset-x-0 top-0 flex flex-col justify-between px-5 py-7 will-change-transform md:px-10 md:py-10"
++        style={{ height: `${100 / SCROLL_LAYOUT.sectionPages}%` }}
++      >
++        <ProjectHeading />
++        <div className="flex justify-center md:justify-start">
++          <ProjectDetails activeIndex={activeIndex} onSelect={scrollToProject} />
++        </div>
++      </div>
++    </section>
++  );
++}
++
++/* -------------------------------------------------------------------------- */
++/* Project stage: static variant (native sticky, DOM images)                  */
++/* -------------------------------------------------------------------------- */
++
++function StaticProjectSpace({
++  activeProjectId,
++  onProjectActivate,
++}: Pick<HtmlOverlayProps, 'activeProjectId' | 'onProjectActivate'>) {
++  const sectionRef = useRef<HTMLElement>(null);
++  const lastIndex = useRef(0);
++  const activeIndex = Math.max(0, PROJECTS.findIndex((project) => project.id === activeProjectId));
++  const project = PROJECTS[activeIndex];
++
++  useEffect(() => {
++    let frame = 0;
++
++    const update = () => {
++      frame = 0;
++      const section = sectionRef.current;
++      if (!section) return;
++      const rect = section.getBoundingClientRect();
++      const travel = Math.max(rect.height - window.innerHeight, 1);
++      const index = Math.round(clamp01(-rect.top / travel) * (PROJECTS.length - 1));
++      if (index !== lastIndex.current) {
++        lastIndex.current = index;
++        onProjectActivate(PROJECTS[index].id);
++      }
++    };
++    const schedule = () => {
++      if (!frame) frame = requestAnimationFrame(update);
++    };
++
++    window.addEventListener('scroll', schedule, { passive: true });
++    window.addEventListener('resize', schedule);
++    update();
++    return () => {
++      window.removeEventListener('scroll', schedule);
++      window.removeEventListener('resize', schedule);
++      if (frame) cancelAnimationFrame(frame);
++    };
++  }, [onProjectActivate]);
++
++  const scrollToProject = (index: number) => {
++    const section = sectionRef.current;
++    if (!section) return;
++    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
++    window.scrollTo({
++      top: window.scrollY + section.getBoundingClientRect().top + index * window.innerHeight,
++      behavior: reduced ? 'auto' : 'smooth',
++    });
++  };
++
++  return (
++    <section
++      ref={sectionRef}
++      className="relative w-full"
++      style={{ height: `${PROJECTS.length * 100}vh` }}
++      aria-labelledby="gallery-title"
++    >
++      <div className="sticky top-0 flex h-screen flex-col px-5 py-7 md:px-10 md:py-10">
++        <ProjectHeading />
++        <div className="mt-4 flex min-h-0 flex-1 flex-col gap-4 md:grid md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] md:items-end md:gap-10">
++          <a
++            href={`/work/${project.id}`}
++            className="order-1 block min-h-[160px] flex-1 overflow-hidden rounded-[24px] border border-bg-border bg-bg-raised md:order-2 md:h-full md:max-h-[70vh] md:flex-none"
++            aria-label={`Open ${project.name} case study`}
++          >
++            <img src={project.image} alt={`${project.name} preview`} className="h-full w-full object-cover" loading="lazy" />
++          </a>
++          <div className="order-2 flex justify-center md:order-1 md:justify-start">
++            <ProjectDetails activeIndex={activeIndex} onSelect={scrollToProject} />
++          </div>
++        </div>
++      </div>
++    </section>
++  );
++}
++
++/* -------------------------------------------------------------------------- */
++/* Page                                                                       */
++/* -------------------------------------------------------------------------- */
++
++export default function HtmlOverlay({ variant, activeProjectId, onProjectActivate }: HtmlOverlayProps) {
++  // Inside <Scroll html> a "page" must equal the canvas height Drei scrolls by (not 100vh,
++  // which differs from the visual viewport on mobile browsers with collapsing toolbars).
++  const page = variant === 'scroll' ? 'h-full' : 'h-screen';
++
++  return (
++    <main className={`w-full text-text-primary ${variant === 'scroll' ? 'h-full' : ''}`} aria-label="LycanForge introduction">
++      <section className={`relative flex ${page} w-full flex-col px-5 py-6 md:px-10 md:py-8`} aria-labelledby="brand-title">
+         <header className="pointer-events-auto flex items-center justify-between text-xs font-medium">
+           <a href="/" className="font-display text-xl font-medium tracking-tight">Lycan<span className="text-accent">Forge</span></a>
+           <nav aria-label="Landing navigation" className="hidden items-center gap-6 md:flex">
+@@ -39,7 +264,7 @@ export default function HtmlOverlay({ activeProjectId, onProjectActivate }: Html
+         </div>
+       </section>
+ 
+-      <section className="flex h-screen w-full items-end px-5 pb-12 md:items-center md:px-10 md:pb-0" aria-labelledby="values-title">
++      <section className={`flex ${page} w-full items-end px-5 pb-12 md:items-center md:px-10 md:pb-0`} aria-labelledby="values-title">
+         <article className="editorial-panel pointer-events-none w-full max-w-xl p-6 md:p-9">
+           <p className="eyebrow mb-5">01 · Principles</p>
+           <h2 id="values-title" className="text-4xl leading-[0.95] md:text-6xl">Useful long after launch.</h2>
+@@ -49,7 +274,7 @@ export default function HtmlOverlay({ activeProjectId, onProjectActivate }: Html
+         </article>
+       </section>
+ 
+-      <section className="flex h-screen w-full items-end justify-end px-5 pb-12 md:items-center md:px-10 md:pb-0" aria-labelledby="services-title">
++      <section className={`flex ${page} w-full items-end justify-end px-5 pb-12 md:items-center md:px-10 md:pb-0`} aria-labelledby="services-title">
+         <article className="editorial-panel pointer-events-none w-full max-w-xl p-6 md:p-9">
+           <p className="eyebrow mb-5">02 · Capabilities</p>
+           <h2 id="services-title" className="text-4xl leading-[0.95] md:text-6xl">Ambition, made practical.</h2>
+@@ -59,7 +284,7 @@ export default function HtmlOverlay({ activeProjectId, onProjectActivate }: Html
+         </article>
+       </section>
+ 
+-      <section className="flex h-screen w-full items-center justify-center px-5" aria-labelledby="archive-title">
++      <section className={`flex ${page} w-full items-center justify-center px-5`} aria-labelledby="archive-title">
+         <div className="pointer-events-none max-w-2xl text-center">
+           <p className="eyebrow mb-5">03 · Selected work</p>
+           <h2 id="archive-title" className="text-5xl leading-[0.92] md:text-7xl">Proof, not promises.</h2>
+@@ -69,52 +294,13 @@ export default function HtmlOverlay({ activeProjectId, onProjectActivate }: Html
+         </div>
+       </section>
+ 
+-      <section className="flex h-screen w-full flex-col justify-between px-5 py-7 md:px-10 md:py-9" aria-labelledby="gallery-title">
+-        <div className="pointer-events-none">
+-          <p className="eyebrow mb-3">04 · Project space</p>
+-          <h2 id="gallery-title" className="text-4xl leading-none md:text-6xl">Choose a case study.</h2>
+-        </div>
+-
+-        <article className="editorial-panel pointer-events-auto mx-auto w-full max-w-2xl p-4 md:p-5">
+-          <div className="flex items-start justify-between gap-5">
+-            <div className="min-w-0">
+-              <p className="eyebrow mb-2">{String(activeIndex + 1).padStart(2, '0')} / {String(PROJECTS.length).padStart(2, '0')}</p>
+-              <a href={`/work/${activeProject.id}`} className="block truncate text-xl font-medium hover:opacity-60 md:text-2xl">
+-                {activeProject.name}
+-              </a>
+-              <p className="mt-1 truncate text-sm text-text-secondary">{activeProject.oneLiner}</p>
+-            </div>
+-            <a href={`/work/${activeProject.id}`} className="cta-pill shrink-0 text-sm" aria-label={`Open ${activeProject.name} case study`}>
+-              Open <span aria-hidden="true">↗</span>
+-            </a>
+-          </div>
+-
+-          <div className="mt-4 flex items-center justify-between border-t border-bg-border pt-4">
+-            <div className="flex gap-2" aria-label="Select project">
+-              {PROJECTS.map((project, index) => (
+-                <button
+-                  key={project.id}
+-                  type="button"
+-                  onClick={() => onProjectActivate(project.id)}
+-                  onFocus={() => onProjectActivate(project.id)}
+-                  className={`flex h-10 w-10 items-center justify-center rounded-full border text-xs transition-colors ${project.id === activeProjectId ? 'border-accent bg-accent text-bg-surface' : 'border-bg-border bg-bg-raised text-text-secondary hover:border-text-primary/30'}`}
+-                  aria-label={`Highlight ${project.name}`}
+-                  aria-pressed={project.id === activeProjectId}
+-                >
+-                  {index + 1}
+-                </button>
+-              ))}
+-            </div>
+-
+-            <div className="flex gap-2 md:hidden">
+-              <button type="button" onClick={selectPrevious} className="flex h-10 w-10 items-center justify-center rounded-full border border-bg-border" aria-label="Previous project">←</button>
+-              <button type="button" onClick={selectNext} className="flex h-10 w-10 items-center justify-center rounded-full border border-bg-border" aria-label="Next project">→</button>
+-            </div>
+-          </div>
+-        </article>
+-      </section>
++      {variant === 'scroll' ? (
++        <ScrollProjectSpace activeProjectId={activeProjectId} onProjectActivate={onProjectActivate} />
++      ) : (
++        <StaticProjectSpace activeProjectId={activeProjectId} onProjectActivate={onProjectActivate} />
++      )}
+ 
+-      <section className="flex h-screen w-full items-center justify-center px-5" aria-labelledby="cta-title">
++      <section className={`flex ${page} w-full items-center justify-center px-5`} aria-labelledby="cta-title">
+         <article className="editorial-panel pointer-events-auto w-full max-w-4xl p-7 text-center md:p-14">
+           <p className="eyebrow mb-5">05 · Start something useful</p>
+           <h2 id="cta-title" className="text-5xl leading-[0.92] md:text-7xl">Ready to build?</h2>
+diff --git a/src/config/animationConfig.ts b/src/config/animationConfig.ts
+index b89ad6d..c5cf1cb 100644
+--- a/src/config/animationConfig.ts
++++ b/src/config/animationConfig.ts
+@@ -2,10 +2,48 @@
+  * Centralized animation configuration
+  * Eliminates magic numbers and makes adjustments easier
+  */
++import { PROJECTS } from '../constants';
++
++/**
++ * Scroll geometry, measured in "pages" (1 page = one viewport height of scrolling).
++ *
++ *   0 .. 4            hero, principles, capabilities, work transition (1 page each)
++ *   galleryStart ..   the pinned project stage: one page of scroll per project step,
++ *                     plus a short dwell on the last project before it releases
++ *   ctaStart          "Ready to build?" arrives as the stage scrolls away
++ *
++ * Everything below is derived from the project count, so adding or removing a project
++ * automatically lengthens or shortens the pinned stage and keeps the 3D scene synced.
++ */
++export function createScrollLayout(projectCount: number) {
++  const count = Math.max(projectCount, 1);
++  const leadPages = 4;
++  const travel = count - 1; // pages of scroll between the first and last project
++  const endDwell = 0.4; // extra pages the last project stays pinned
++  const pin = travel + endDwell; // total pages the stage stays pinned
++  const galleryStart = leadPages;
++  const pinEnd = galleryStart + pin;
++  const ctaStart = pinEnd + 1; // the released stage needs one page to scroll out
++  return {
++    count,
++    travel,
++    pin,
++    galleryStart,
++    pinEnd,
++    ctaStart,
++    sectionPages: 1 + pin, // height of the gallery section in pages
++    pages: ctaStart + 1, // value for <ScrollControls pages>
++  };
++}
++
++export const SCROLL_LAYOUT = createScrollLayout(PROJECTS.length);
++
++/** Convert a scroll position in pages to ScrollControls' 0..1 offset. */
++const at = (page: number) => page / (SCROLL_LAYOUT.pages - 1);
+ 
+ export const ANIMATION_CONFIG = {
+   scroll: {
+-    pages: 6,
++    pages: SCROLL_LAYOUT.pages,
+     damping: 0.25,
+     distance: 1,
+   },
+@@ -40,33 +78,33 @@ export const ANIMATION_CONFIG = {
+   
+   sections: {
+     brand: {
+-      start: 0,
+-      end: 0.16,
++      start: at(0),
++      end: at(0.8),
+       speed: 0.005,
+       rotationSpeed: 0.005,
+     },
+     values: {
+-      start: 0.16,
+-      end: 0.34,
++      start: at(0.8),
++      end: at(1.7),
+       floatSpeed: 1.5,
+       floatIntensity: 2,
+     },
+     services: {
+-      start: 0.34,
+-      end: 0.52,
++      start: at(1.7),
++      end: at(2.6),
+       speed: 2,
+     },
+     portfolio: {
+-      start: 0.52,
+-      end: 0.66,
++      start: at(2.6),
++      end: at(3.3),
+       speed: 1,
+     },
+     gallery: {
+-      start: 0.66,
+-      end: 0.9,
++      start: at(3.3),
++      end: at(SCROLL_LAYOUT.ctaStart),
+     },
+     cta: {
+-      start: 0.9,
++      start: at(SCROLL_LAYOUT.pinEnd + 0.5),
+       end: 1.0,
+     },
+   },
+diff --git a/src/index.css b/src/index.css
+index c253746..7316431 100644
+--- a/src/index.css
++++ b/src/index.css
+@@ -87,6 +87,22 @@ button:focus-visible {
+   @apply outline-2 outline-offset-2 outline-accent;
+ }
+ 
++/* Project details swap in when the focused case study changes. */
++@keyframes detail-in {
++  from {
++    opacity: 0;
++    transform: translateY(10px);
++  }
++  to {
++    opacity: 1;
++    transform: none;
++  }
++}
++
++.detail-swap {
++  animation: detail-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
++}
++
+ .work-grid {
+   display: grid;
+   grid-template-columns: repeat(12, 1fr);
+diff --git a/src/pages/Contact.tsx b/src/pages/Contact.tsx
+index 8d02e34..e614c84 100644
+--- a/src/pages/Contact.tsx
++++ b/src/pages/Contact.tsx
+@@ -45,6 +45,13 @@ export default function Contact() {
+   const [isSubmitting, setIsSubmitting] = useState(false);
+   const [isSuccess, setIsSuccess] = useState(false);
+   const [details, setDetails] = useState({ name: '', email: '', phone: '', message: '' });
++  const [honeypot, setHoneypot] = useState('');
++  const [submitError, setSubmitError] = useState<string | null>(null);
++
++  const labelFor = (stepId: string) => {
++    const step = steps.find((s) => s.id === stepId);
++    return step?.options.find((o) => o.id === answers[stepId])?.label ?? '';
++  };
+ 
+   const handleOptionSelect = (stepId: string, optionId: string) => {
+     setAnswers({ ...answers, [stepId]: optionId });
+@@ -57,31 +64,40 @@ export default function Contact() {
+ 
+   const handleSubmit = async (e: FormEvent) => {
+     e.preventDefault();
++    if (isSubmitting) return;
+     setIsSubmitting(true);
+-    
+-    // Structured data for simulated email
+-    const emailPayload = {
+-      subject: `New Project Enquiry: ${details.name}`,
+-      body: `
+-        Name: ${details.name}
+-        Email: ${details.email}
+-        Phone: ${details.phone}
+-        
+-        Requirements:
+-        - Needs: ${answers.needs}
+-        - Budget: ${answers.budget}
+-        - Timeline: ${answers.timeline}
+-        
+-        Message:
+-        ${details.message}
+-      `
+-    };
+-    console.log("Simulating email send to client@lycanforge.com.ng:", emailPayload);
++    setSubmitError(null);
++
++    try {
++      const response = await fetch('/api/contact', {
++        method: 'POST',
++        headers: { 'Content-Type': 'application/json' },
++        body: JSON.stringify({
++          name: details.name,
++          email: details.email,
++          phone: details.phone,
++          message: details.message,
++          needs: labelFor('needs'),
++          budget: labelFor('budget'),
++          timeline: labelFor('timeline'),
++          website: honeypot,
++        }),
++      });
++
++      if (!response.ok) {
++        throw new Error(response.status === 429 ? 'rate_limited' : 'send_failed');
++      }
+ 
+-    // Simulate API call
+-    await new Promise(r => setTimeout(r, 2000));
+-    setIsSubmitting(false);
+-    setIsSuccess(true);
++      setIsSuccess(true);
++    } catch (error) {
++      setSubmitError(
++        error instanceof Error && error.message === 'rate_limited'
++          ? 'Too many attempts from this connection. Please wait a few minutes, or reach us on WhatsApp.'
++          : 'Your message could not be sent. Please try again, or reach us directly on WhatsApp or by email.',
++      );
++    } finally {
++      setIsSubmitting(false);
++    }
+   };
+ 
+   const progress = ((currentStep + 1) / (steps.length + 1)) * 100;
+@@ -204,7 +220,32 @@ export default function Contact() {
+                           />
+                         </div>
+ 
+-                        <button 
++                        {/* Honeypot: hidden from people, tempting to bots */}
++                        <div className="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden="true">
++                          <label>
++                            Website
++                            <input
++                              type="text"
++                              name="website"
++                              tabIndex={-1}
++                              autoComplete="off"
++                              value={honeypot}
++                              onChange={(e) => setHoneypot(e.target.value)}
++                            />
++                          </label>
++                        </div>
++
++                        {submitError && (
++                          <div role="alert" className="rounded-xl border border-bg-border bg-bg-surface p-4 text-sm text-text-secondary">
++                            <p>{submitError}</p>
++                            <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
++                              <a href="https://wa.me/2347058392920" className="text-accent hover:underline">Message on WhatsApp</a>
++                              <a href="mailto:client@lycanforge.com.ng" className="text-accent hover:underline">client@lycanforge.com.ng</a>
++                            </p>
++                          </div>
++                        )}
++
++                        <button
+                           disabled={isSubmitting}
+                           className="cta-pill w-full flex items-center justify-center gap-3 disabled:opacity-50"
+                         >
+diff --git a/src/pages/Home.tsx b/src/pages/Home.tsx
+index abe1c99..1c2427b 100644
+--- a/src/pages/Home.tsx
++++ b/src/pages/Home.tsx
+@@ -53,7 +53,7 @@ function StaticLanding({
+       <p className="fixed right-4 top-4 z-10 rounded-full border border-bg-border bg-bg-base/90 px-3 py-2 text-xs text-text-secondary backdrop-blur-sm">
+         {message}
+       </p>
+-      <HtmlOverlay activeProjectId={activeProjectId} onProjectActivate={onProjectActivate} />
++      <HtmlOverlay variant="static" activeProjectId={activeProjectId} onProjectActivate={onProjectActivate} />
+     </div>
+   );
+ }
+@@ -137,9 +137,9 @@ export default function Home() {
+             damping={ANIMATION_CONFIG.scroll.damping}
+             distance={ANIMATION_CONFIG.scroll.distance}
+           >
+-            <Scene activeProjectId={activeProjectId} onProjectActivate={activateProject} onProjectOpen={openProject} />
+-            <Scroll html style={{ width: '100%' }}>
+-              <HtmlOverlay activeProjectId={activeProjectId} onProjectActivate={activateProject} />
++            <Scene activeProjectId={activeProjectId} onProjectOpen={openProject} />
++            <Scroll html style={{ width: '100%', height: '100%' }}>
++              <HtmlOverlay variant="scroll" activeProjectId={activeProjectId} onProjectActivate={activateProject} />
+             </Scroll>
+           </ScrollControls>
+         </Canvas>
+diff --git a/src/utils/gallerySequence.ts b/src/utils/gallerySequence.ts
+new file mode 100644
+index 0000000..514a63f
+--- /dev/null
++++ b/src/utils/gallerySequence.ts
+@@ -0,0 +1,53 @@
++import { SCROLL_LAYOUT } from '../config/animationConfig';
++
++/**
++ * Pure scroll -> project-sequence math shared by the 3D scene and the HTML overlay.
++ * Both layers feed in the same damped ScrollControls offset, so they always agree.
++ */
++
++type ScrollLayout = typeof SCROLL_LAYOUT;
++
++const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
++const clamp01 = (value: number) => clamp(value, 0, 1);
++
++const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
++
++/** Fraction of each project step spent holding still at either end ("settle"). */
++const DWELL = 0.16;
++
++/** Card position within one step: holds, glides, holds. 0..1 -> 0..1 */
++export function dwellEase(t: number): number {
++  return easeInOutCubic(clamp01((t - DWELL) / (1 - 2 * DWELL)));
++}
++
++export interface GalleryState {
++  /** 1 while the stage is a full page below the viewport, 0 once it has arrived. */
++  leadIn: number;
++  /** 0 while pinned, rising to 1 as the released stage scrolls off the top. */
++  release: number;
++  /** Pages the stage has been pinned for (counter-translate amount, in pages). */
++  pinned: number;
++  /** Raw project progress, 0..count-1 (linear in scroll). */
++  progress: number;
++  /** Eased project progress: cards hold at integers and glide in between. */
++  eased: number;
++  /** Project closest to the centre of the stage. */
++  index: number;
++}
++
++export function getGalleryState(scrollPages: number, layout: ScrollLayout = SCROLL_LAYOUT): GalleryState {
++  const last = layout.count - 1;
++  const pinned = clamp(scrollPages - layout.galleryStart, 0, layout.pin);
++  const progress = Math.min(pinned, layout.travel);
++  const base = Math.min(Math.floor(progress + 1e-6), last);
++  const eased = last === 0 ? 0 : Math.min(base + (base >= last ? 0 : dwellEase(progress - base)), last);
++
++  return {
++    leadIn: clamp01(layout.galleryStart - scrollPages),
++    release: clamp01(scrollPages - layout.pinEnd),
++    pinned,
++    progress,
++    eased,
++    index: clamp(Math.round(eased), 0, last),
++  };
++}
+diff --git a/vercel.json b/vercel.json
+index 4175178..2a8559d 100644
+--- a/vercel.json
++++ b/vercel.json
+@@ -4,7 +4,7 @@
+   "outputDirectory": "dist",
+   "rewrites": [
+     {
+-      "source": "/(.*)",
++      "source": "/((?!api/).*)",
+       "destination": "/"
+     }
+   ]
+diff --git a/vite.config.ts b/vite.config.ts
+index 0506f1b..3636b89 100644
+--- a/vite.config.ts
++++ b/vite.config.ts
+@@ -1,15 +1,11 @@
+ import tailwindcss from '@tailwindcss/vite';
+ import react from '@vitejs/plugin-react';
+ import path from 'path';
+-import {defineConfig, loadEnv} from 'vite';
++import {defineConfig} from 'vite';
+ 
+-export default defineConfig(({mode}) => {
+-  const env = loadEnv(mode, '.', '');
++export default defineConfig(() => {
+   return {
+     plugins: [react(), tailwindcss()],
+-    define: {
+-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+-    },
+     resolve: {
+       alias: {
+         '@': path.resolve(__dirname, '.'),
+-- 
+2.43.0
+
