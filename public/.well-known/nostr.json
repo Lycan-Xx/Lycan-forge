@@ -1,0 +1,11 @@
+{
+  "names": {
+    "lycan": "93bff6dff051698ec24f2ea64638294f1992025b767dca1c89458d83f31740f7"
+  },
+  "relays": {
+    "93bff6dff051698ec24f2ea64638294f1992025b767dca1c89458d83f31740f7": [
+      "wss://relay.damus.io",
+      "wss://nos.lol"
+    ]
+  }
+}
