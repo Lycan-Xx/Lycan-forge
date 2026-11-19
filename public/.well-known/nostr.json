@@ -1,9 +1,14 @@
 {
   "names": {
-    "lycan": "93bff6dff051698ec24f2ea64638294f1992025b767dca1c89458d83f31740f7"
+    "lycan": "93bff6dff051698ec24f2ea64638294f1992025b767dca1c89458d83f31740f7",
+    "sani": "c7ca5aa5c8d8d1df796df8bdc807e473a7b80f43ee4e37f9800fd90a44f126b7"
   },
   "relays": {
     "93bff6dff051698ec24f2ea64638294f1992025b767dca1c89458d83f31740f7": [
+      "wss://relay.damus.io",
+      "wss://nos.lol"
+    ],
+    "c7ca5aa5c8d8d1df796df8bdc807e473a7b80f43ee4e37f9800fd90a44f126b7": [
       "wss://relay.damus.io",
       "wss://nos.lol"
     ]
